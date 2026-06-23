@@ -360,13 +360,9 @@ from pydantic import BaseModel
 
 
 class SyncConfigPayload(BaseModel):
-    url: str
-    time: str
-    enabled: bool
-    token: str = ""
-    headers: dict = {}
-    # 中转页模式
-    transit_enabled: bool = False
+    """同步配置 (中转页模式)"""
+    enabled: bool = True
+    time: str = "08:30"
     transit_url: str = ""
     transit_strategy: str = "auto"
     transit_selector: str = ""
@@ -397,14 +393,10 @@ def api_sync_get_config():
 
 @router.put("/api/sync/config")
 def api_sync_update_config(payload: SyncConfigPayload):
-    """更新同步配置(云端地址 + 时间 + 启用)"""
+    """更新同步配置 (中转页模式)"""
     return SyncService.instance().update_config(
-        url=payload.url,
-        time=payload.time,
         enabled=payload.enabled,
-        token=payload.token,
-        headers=payload.headers,
-        transit_enabled=payload.transit_enabled,
+        time=payload.time,
         transit_url=payload.transit_url,
         transit_strategy=payload.transit_strategy,
         transit_selector=payload.transit_selector,
@@ -414,57 +406,44 @@ def api_sync_update_config(payload: SyncConfigPayload):
 
 @router.post("/api/sync/test")
 def api_sync_test(payload: SyncConfigPayload | None = None):
-    """测试连接(不实际入库)"""
-    svc = SyncService.instance()
-    # 中转页模式 - 走 Playwright 测试
-    if payload and payload.transit_enabled and payload.transit_url:
-        try:
-            from .cloud_sync import TransitDownloader
-            downloader = TransitDownloader(timeout=30)
-            data = downloader.download(
-                page_url=payload.transit_url,
-                strategy=payload.transit_strategy or "auto",
-                selector=payload.transit_selector or "",
-                cookie_str=payload.transit_cookie or "",
-            )
-            size = len(data)
-            is_xlsx = (size >= 4 and data[:2] == b'PK') or b'spreadsheetml' in data[:200].lower()
-            return {
-                "success": True,
-                "message": f"中转页下载成功,返回 {size} 字节" + (" · 识别为 Excel" if is_xlsx else " · ⚠️ 可能是非 Excel 格式"),
-                "size": size,
-                "is_xlsx": is_xlsx,
-            }
-        except Exception as e:
-            return {"success": False, "message": f"中转页测试失败: {type(e).__name__}: {str(e)[:200]}"}
-    # 直连模式
-    return svc.test_connection(
-        url=(payload.url if payload else None) or None,
-        token=(payload.token if payload else None) or None,
-        headers=(payload.headers if payload else None) or None,
-    )
+    """测试中转页下载 (不实际入库)"""
+    if not payload or not payload.transit_url:
+        return {"success": False, "message": "请先填写中转页 URL"}
+    try:
+        from .cloud_sync import TransitDownloader
+        downloader = TransitDownloader(timeout=30)
+        data = downloader.download(
+            page_url=payload.transit_url,
+            strategy=payload.transit_strategy or "auto",
+            selector=payload.transit_selector or "",
+            cookie_str=payload.transit_cookie or "",
+        )
+        size = len(data)
+        is_xlsx = (size >= 4 and data[:2] == b'PK') or b'spreadsheetml' in data[:200].lower()
+        return {
+            "success": True,
+            "message": f"中转页下载成功,返回 {size} 字节" + (" · 识别为 Excel" if is_xlsx else " · ⚠️ 可能是非 Excel 格式"),
+            "size": size,
+            "is_xlsx": is_xlsx,
+        }
+    except Exception as e:
+        return {"success": False, "message": f"中转页测试失败: {type(e).__name__}: {str(e)[:200]}"}
 
 
 @router.post("/api/sync/inspect")
 def api_sync_inspect(payload: SyncConfigPayload | None = None):
-    """诊断·下载文件并返回实际列名与示例行(不实际入库)"""
-    svc = SyncService.instance()
-    is_transit = payload and payload.transit_enabled and payload.transit_url
+    """诊断·下载文件并返回实际列名与示例行 (不实际入库)"""
+    if not payload or not payload.transit_url:
+        return {"success": False, "message": "请先填写中转页 URL"}
     try:
-        if is_transit:
-            from .cloud_sync import TransitDownloader
-            downloader = TransitDownloader(timeout=30)
-            data = downloader.download(
-                page_url=payload.transit_url,
-                strategy=payload.transit_strategy or "auto",
-                selector=payload.transit_selector or "",
-                cookie_str=payload.transit_cookie or "",
-            )
-        else:
-            url = (payload.url if payload else None) or svc.status.to_dict()["config"].get("url")
-            if not url:
-                return {"success": False, "message": "未提供 URL"}
-            data = svc._http_get(url, {}).content
+        from .cloud_sync import TransitDownloader
+        downloader = TransitDownloader(timeout=30)
+        data = downloader.download(
+            page_url=payload.transit_url,
+            strategy=payload.transit_strategy or "auto",
+            selector=payload.transit_selector or "",
+            cookie_str=payload.transit_cookie or "",
+        )
         # 解析列名
         import openpyxl
         from io import BytesIO

@@ -60,10 +60,10 @@ def startup_seed():
     # 启动云端同步后台调度(默认每天 08:30 + 可手动触发)
     sync = SyncService.instance()
     sync.start()
-    if settings.cloud_excel_url:
-        print(f"[Startup] 云同步已启动: URL={settings.cloud_excel_url}, 时间={settings.cloud_sync_time}")
+    if settings.cloud_sync_transit_url:
+        print(f"[Startup] 云同步调度运行中: 中转页={settings.cloud_sync_transit_url[:50]}..., 时间={settings.cloud_sync_time}")
     else:
-        print(f"[Startup] 云同步调度运行中(未配置 URL),可通过 PUT /api/sync/config 配置")
+        print(f"[Startup] 云同步调度运行中(未配置中转页 URL),可通过 PUT /api/sync/config 配置")
 
 
 @app.get("/")

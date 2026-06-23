@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-import requests
 
 from . import config
 from .database import SessionLocal
@@ -33,8 +32,6 @@ class SyncStatus:
         self.last_duration_ms: int = 0
         self.next_run_at: Optional[datetime] = None
         self.is_running: bool = False
-        self.last_etag: Optional[str] = None
-        self.last_modified: Optional[str] = None
         self.history: list[dict] = []           #  Recent 20 records
 
     def to_dict(self) -> dict:
@@ -46,14 +43,10 @@ class SyncStatus:
             "last_duration_ms": self.last_duration_ms,
             "next_run_at": self.next_run_at.isoformat() if self.next_run_at else None,
             "is_running": self.is_running,
-            "last_etag": self.last_etag,
-            "last_modified": self.last_modified,
             "history": self.history[:20],
             "config": {
-                "url": config.settings.cloud_excel_url,
-                "time": config.settings.cloud_sync_time,
                 "enabled": config.settings.cloud_sync_enabled,
-                "transit_enabled": config.settings.cloud_sync_transit_enabled,
+                "time": config.settings.cloud_sync_time,
                 "transit_url": config.settings.cloud_sync_transit_url,
                 "transit_strategy": config.settings.cloud_sync_transit_strategy,
                 "transit_selector": config.settings.cloud_sync_transit_selector,
@@ -123,40 +116,30 @@ class SyncService:
     def get_status(self) -> dict:
         return self.status.to_dict()
 
-    def update_config(self, url: str, time: str, enabled: bool,
-                      token: str = "", headers: dict = None,
-                      transit_enabled: bool = False,
+    def update_config(self, enabled: bool, time: str,
                       transit_url: str = "",
                       transit_strategy: str = "auto",
                       transit_selector: str = "",
                       transit_cookie: str = "") -> dict:
-        """Update sync config"""
-        #  Validate time format HH:MM
+        """Update sync config (transit page mode only)"""
         try:
             datetime.strptime(time, "%H:%M")
         except ValueError:
-            return {"success": False, "message": f"Time format error: {time},should be HH:MM"}
-        if url and not (url.startswith("http://") or url.startswith("https://")):
-            return {"success": False, "message": "URL must start with http:// or https://"}
+            return {"success": False, "message": f"时间格式错误: {time},应为 HH:MM"}
         if transit_url and not (transit_url.startswith("http://") or transit_url.startswith("https://")):
-            return {"success": False, "message": "中转页 URL must start with http:// or https://"}
+            return {"success": False, "message": "中转页 URL 必须以 http:// 或 https:// 开头"}
 
-        config.settings.cloud_excel_url = url
-        config.settings.cloud_sync_time = time
         config.settings.cloud_sync_enabled = enabled
-        if token:
-            config.settings.cloud_sync_token = token
-        if headers:
-            config.settings.cloud_sync_headers = headers
-        #  Transit page settings
-        config.settings.cloud_sync_transit_enabled = transit_enabled
+        config.settings.cloud_sync_time = time
         config.settings.cloud_sync_transit_url = transit_url
         config.settings.cloud_sync_transit_strategy = transit_strategy
         config.settings.cloud_sync_transit_selector = transit_selector
         config.settings.cloud_sync_transit_cookie = transit_cookie
-        #  Recalculate next run time
+        # 中转页总是启用(只要有 URL)
+        config.settings.cloud_sync_transit_enabled = bool(transit_url)
+        # 重新计算下次运行时间
         self.status.next_run_at = self._calc_next_run()
-        return {"success": True, "message": "Config updated", "config": self.status.to_dict()["config"]}
+        return {"success": True, "message": "配置已更新", "config": self.status.to_dict()["config"]}
 
     #  ============================================================
     #  Internal methods
@@ -165,7 +148,7 @@ class SyncService:
         """Scheduler loop - check every 30s if scheduled"""
         while not self._stop_event.is_set():
             try:
-                if config.settings.cloud_sync_enabled and config.settings.cloud_excel_url:
+                if config.settings.cloud_sync_enabled and config.settings.cloud_sync_transit_url:
                     now = datetime.now()
                     if self.status.next_run_at and now >= self.status.next_run_at:
                         log.info("[Sync] Scheduled sync triggered")
@@ -192,92 +175,13 @@ class SyncService:
             return None
 
     def _do_sync(self, force: bool = False) -> dict:
-        """Download + import"""
+        """Download + import (transit page only)"""
         start = time.time()
-        #  Check transit or direct mode
-        if config.settings.cloud_sync_transit_enabled and config.settings.cloud_sync_transit_url:
-            return self._do_transit_sync(force=force, start=start)
-        url = config.settings.cloud_excel_url
-        if not url:
-            msg = "Cloud URL not configured"
+        if not config.settings.cloud_sync_transit_url:
+            msg = "未配置中转页 URL · 请点“同步配置”按钮设置"
             self._record_result("failed", msg, 0, int((time.time()-start)*1000))
             return {"success": False, "message": msg}
-
-        log.info(f"[Sync] Start sync: {url}, force={force}")
-
-        #  Prepare headers
-        headers = dict(config.settings.cloud_sync_headers or {})
-        if config.settings.cloud_sync_token:
-            headers["Authorization"] = f"Bearer {config.settings.cloud_sync_token}"
-        if self.status.last_etag and not force:
-            headers["If-None-Match"] = self.status.last_etag
-        if self.status.last_modified and not force:
-            headers["If-Modified-Since"] = self.status.last_modified
-
-        #  1. GET (ETag check, 304 = unchanged)
-        file_bytes = None
-        last_err = None
-        try:
-            resp = self._http_get(url, headers)
-            if resp.status_code == 304:
-                msg = f"File unchanged (ETag: {self.status.last_etag[:16]}...)"
-                self._record_result("skipped", msg, 0, int((time.time()-start)*1000))
-                return {"success": True, "message": msg, "skipped": True}
-            resp.raise_for_status()
-            file_bytes = resp.content
-            #  Save ETag/Last-Modified
-            self.status.last_etag = resp.headers.get("ETag")
-            self.status.last_modified = resp.headers.get("Last-Modified")
-        except Exception as e:
-            last_err = e
-            #  Retry (exponential backoff)
-            for i in range(config.settings.cloud_sync_retry):
-                time.sleep(2 ** i)
-                try:
-                    log.info(f"[Sync] Retry {i+2}...")
-                    resp = self._http_get(url, headers)
-                    resp.raise_for_status()
-                    file_bytes = resp.content
-                    self.status.last_etag = resp.headers.get("ETag")
-                    self.status.last_modified = resp.headers.get("Last-Modified")
-                    break
-                except Exception as e2:
-                    last_err = e2
-                    log.warning(f"[Sync] Retry {i+2} 失败: {e2}")
-            if file_bytes is None:
-                msg = self._classify_error(last_err, url)
-                self._record_result("failed", msg, 0, int((time.time()-start)*1000))
-                return {"success": False, "message": msg}
-
-        if not file_bytes or len(file_bytes) < 100:
-            msg = f"Download too small ({len(file_bytes) if file_bytes else 0} bytes), might not be valid Excel"
-            self._record_result("failed", msg, 0, int((time.time()-start)*1000))
-            return {"success": False, "message": msg}
-
-        #  2. Parse + import
-        try:
-            from datetime import datetime
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"cloud_sync_{ts}.xlsx"
-            db = SessionLocal()
-            try:
-                batch = import_to_db(
-                    db, file_bytes, filename,
-                    operator="cloud-sync", replace=True,
-                )
-                inserted = batch.row_count
-                skipped = batch.skipped_count
-                msg = f"Sync {inserted} rows, skipped {skipped} 条"
-                self._record_result("success", msg, inserted, int((time.time()-start)*1000))
-                log.info(f"[Sync] {msg}")
-                return {"success": True, "message": msg, "inserted": inserted, "skipped": skipped}
-            finally:
-                db.close()
-        except Exception as e:
-            msg = f"Import failed: {e}"
-            log.exception(msg)
-            self._record_result("failed", msg, 0, int((time.time()-start)*1000))
-            return {"success": False, "message": msg}
+        return self._do_transit_sync(force=force, start=start)
 
     def _do_transit_sync(self, force: bool = False, start: float = 0) -> dict:
         """中转页模式同步:打开页面 → 点击下载 → 拿 Excel"""
@@ -358,22 +262,6 @@ class SyncService:
             self._record_result("failed", msg, 0, int((time.time()-start)*1000))
             return {"success": False, "message": msg}
 
-    def _http_get(self, url: str, headers: dict):
-        """HTTP GET. PP_CLOUD_PROXY set -> use it. Empty -> bypass system proxy (direct)"""
-        proxy_url = getattr(config.settings, "cloud_sync_proxy", "")
-        if proxy_url:
-            proxies = {"http": proxy_url, "https": proxy_url}
-        else:
-            #  Pass None to bypass system proxy (common on Windows corp networks)
-            proxies = {"http": None, "https": None}
-        return requests.get(
-            url,
-            headers=headers,
-            timeout=config.settings.cloud_sync_timeout,
-            allow_redirects=True,
-            proxies=proxies,
-        )
-
     def _classify_transit_error(self, err: Exception) -> str:
         """Classify Playwright/transit errors to user-friendly Chinese messages"""
         s = str(err)
@@ -401,64 +289,6 @@ class SyncService:
             return f"未找到元素 (选择器不存在或不可点击)。\n原始错误: {s[:200]}"
         # 默认
         return f"中转页下载失败: {type(err).__name__}: {s[:200]}"
-
-    def _classify_error(self, err: Exception, url: str) -> str:
-        """把异常分类成人话-避免堆一串堆栈"""
-        import re
-        s = str(err)
-        #  Proxy error
-        if "ProxyError" in s or "Tunnel connection failed" in s:
-            return ("无法连接代理服务器(检查企业代理是否在线,或设置 PP_CLOUD_PROXY 绕过)."
-                    f"Original error: {s[:80]}")
-        #  DNS / Connection error
-        if "ConnectionError" in s or "NameResolutionError" in s or "NewConnectionError" in s:
-            return (f"无法连接主机(检查 URL/网络).Original error: {s[:80]}")
-        #  Timeout
-        if "Timeout" in s:
-            return (f"请求Timeout({config.settings.cloud_sync_timeout}秒).Original error: {s[:80]}")
-        #  404 / 403 / 401
-        m = re.search(r"(\d{3})\s*Client Error", s)
-        if m:
-            code = m.group(1)
-            hint = {401: "Auth required (check Token)", 403: "Forbidden (check permission)", 404: "Not found (check URL)"}.get(code, "")
-            return f"HTTP {code} {hint}.Original error: {s[:80]}"
-        m = re.search(r"(\d{3})\s*Server Error", s)
-        if m:
-            return f"Server error HTTP {m.group(1)}.Original error: {s[:80]}"
-        return f"下载失败: {s[:120]}"
-
-    def test_connection(self, url: str = None, token: str = None,
-                        headers: dict = None) -> dict:
-        """测试 URL 是否可访问(GET 请求一次)-不实际入库"""
-        url = url or config.settings.cloud_excel_url
-        if not url:
-            return {"success": False, "message": "URL not provided"}
-        if not (url.startswith("http://") or url.startswith("https://")):
-            return {"success": False, "message": "URL must start with http:// or https://"}
-        h = dict(headers or config.settings.cloud_sync_headers or {})
-        if token or config.settings.cloud_sync_token:
-            h["Authorization"] = f"Bearer {token or config.settings.cloud_sync_token}"
-        try:
-            resp = self._http_get(url, h)
-            if resp.status_code == 200:
-                size = len(resp.content)
-                ct = resp.headers.get("Content-Type", "unknown")
-                etag = resp.headers.get("ETag", "")
-                return {
-                    "success": True,
-                    "message": f"Connected, returned {size} bytes, Content-Type: {ct}",
-                    "status_code": resp.status_code,
-                    "size": size,
-                    "etag": etag,
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"HTTP {resp.status_code} {resp.reason}",
-                    "status_code": resp.status_code,
-                }
-        except Exception as e:
-            return {"success": False, "message": self._classify_error(e, url)}
 
     def _record_result(self, result: str, message: str, inserted: int, duration_ms: int):
         self.status.last_run_at = datetime.now()
@@ -499,10 +329,7 @@ class TransitDownloader:
             raise RuntimeError(
                 "Transit needs Playwright. Install: pip install playwright && playwright install chromium"
             )
-        proxy_url = getattr(config.settings, "cloud_sync_proxy", "")
         launch_kwargs = {"headless": self.headless}
-        if proxy_url:
-            launch_kwargs["proxy"] = {"server": proxy_url}
         browser_pref = getattr(config.settings, "cloud_sync_browser", "auto")
         self._playwright = sync_playwright().start()
         last_err = None
@@ -632,7 +459,6 @@ class TransitDownloader:
         """GET the URL in current context"""
         #  Use Playwright context request (with cookies)
         api_request = ctx.request
-        proxy_url = getattr(config.settings, "cloud_sync_proxy", "")
         resp = api_request.get(href, timeout=self.timeout)
         if not resp.ok:
             raise RuntimeError(f"Download failed HTTP {resp.status}: {href[:80]}")

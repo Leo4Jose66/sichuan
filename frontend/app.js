@@ -244,6 +244,8 @@ const app = createApp({
       }
     };
     const openSyncConfig = async () => {
+      // 先拉取最新配置，避免拿到过期数据导致保存时清空
+      await loadSyncStatus();
       const cfg = syncStatus.value.config || {};
       syncConfigForm.time = cfg.time || '08:30';
       syncConfigForm.enabled = cfg.enabled ?? true;
@@ -255,6 +257,11 @@ const app = createApp({
       syncConfigVisible.value = true;
     };
     const saveSyncConfig = async () => {
+      // 验证必填项
+      if (!syncConfigForm.transit_url) {
+        ElementPlus.ElMessage.warning('请填写中转页 URL');
+        return;
+      }
       try {
         const payload = {
           ...syncConfigForm,
