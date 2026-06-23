@@ -50,11 +50,13 @@ def api_data(db: Session = Depends(get_db)):
     items = []
     for p in projects:
         items.append({
+            "id": p.id,
             "project_no": p.project_no,
             "opportunity_name": p.opportunity_name,
             "customer": p.customer,
             "owner": p.owner,
             "partner": p.partner,
+            "partner_category": p.partner_category,
             "industry": p.industry,
             "track": p.track,
             "deployment_mode": p.deployment_mode,
@@ -343,6 +345,7 @@ def api_options(db: Session = Depends(get_db)):
     return {
         "confidence": distinct_values(Project.confidence),
         "partner": distinct_values(Project.partner),
+        "partner_category": distinct_values(Project.partner_category),
         "po_ho": distinct_values(Project.po_ho),
         "industry": distinct_values(Project.industry),
         "track": distinct_values(Project.track),

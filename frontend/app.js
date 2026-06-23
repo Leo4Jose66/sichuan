@@ -145,6 +145,7 @@ const app = createApp({
 
     // 项目明细
     const projectList = ref({ items: [], total: 0, page: 1, page_size: 20 });
+    const currentPage = ref(1);  // 独立维护当前页 - 避免序号在新页不更新
 
     // ECharts 实例 - 使用函数 ref避免 Vue 覆盖 ref 对象
     const chartRefs = {
@@ -701,9 +702,19 @@ const app = createApp({
     };
 
     const loadProjects = (page = 1) => {
+      currentPage.value = page;
       const items = displayedProjects.value;
+      // 防重 - 用 id 去重,避免 Vue reactivity 问题导致重复
+      const seen = new Set();
+      const sliced = items.slice((page - 1) * 20, page * 20);
+      const unique = sliced.filter(p => {
+        const k = p.id || p.opportunity_name;
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
       projectList.value = {
-        items: items.slice((page - 1) * 20, page * 20),
+        items: unique,
         total: items.length,
         page: page,
         page_size: 20,
@@ -759,7 +770,7 @@ const app = createApp({
 
     // 跨页稳定的序号 - 基于原始数据顺序,不随排序变化
     const indexMethod = (index) => {
-      const page = projectList.value?.page || 1;
+      const page = currentPage.value || projectList.value?.page || 1;
       const size = projectList.value?.page_size || 20;
       return (page - 1) * size + index + 1;
     };
@@ -1466,6 +1477,7 @@ const app = createApp({
       drillViewTitle,
       activeFiltersDisplay,
       goBack,
+      drillToDim,
       // 明细表
       tableFilters,
       sortField,
@@ -1499,6 +1511,7 @@ const app = createApp({
       filters,
       filterOptions,
       projectList,
+      currentPage,
       chartRefs,
 
       // 上传
@@ -2087,7 +2100,7 @@ const app = createApp({
               layout="prev, pager, next, total"
               :total="projectList.total"
               :page-size="projectList.page_size"
-              :current-page="projectList.page"
+              :current-page="currentPage"
               @current-change="onPageChange"
             />
           </div>

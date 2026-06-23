@@ -64,7 +64,7 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
     if not rows:
         return [], ["Excel 文件为空"]
 
-    header_row = [str(c).strip() if c is not None else "" for c in rows[0]]
+    header_row = [str(c).strip().lstrip('\ufeff') if c is not None else "" for c in rows[0]]  # 去 BOM
     print(f"[DEBUG] 表头: {header_row[:10]}...")
     print(f"[DEBUG] 映射表: {list(excel_to_field.keys())[:10]}...")
 
@@ -76,7 +76,12 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
             col_index_map[field_key] = col_idx
 
     if not col_index_map:
-        return [], [f"未匹配到任何已知字段。Excel 表头: {header_row[:5]}..."]
+        # 给个明确的提示，告诉用户哪些列被识别到了
+        return [], [
+            f"未匹配到任何已知字段。",
+            f"你的 Excel 表头: {header_row[:10]}",
+            f"系统期待的字段: {list(excel_to_field.keys())}",
+        ]
 
     # 解析数据行
     parsed = []
@@ -84,16 +89,20 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
 
     for row_idx, row in enumerate(rows[1:], start=2):
         if not row or all(c is None or str(c).strip() == "" for c in row):
-            continue  # 跳过空行
+            continue  # 跳过完全空行(静默)
 
         record = {}
         for field_key, col_idx in col_index_map.items():
             if col_idx < len(row):
-                record[field_key] = row[col_idx]
+                v = row[col_idx]
+                # 字符串去两端空格(避免 Excel 复制带来的空格差异)
+                if isinstance(v, str):
+                    v = v.strip()
+                record[field_key] = v
 
         # 必填校验 - 以机会点名称为主(项目编号只是序号,可空)
-        opportunity_name = record.get("opportunity_name")
-        if not opportunity_name:
+        opp_name = record.get("opportunity_name")
+        if opp_name is None or (isinstance(opp_name, str) and not opp_name.strip()):
             errors.append(f"第 {row_idx} 行: 机会点名称为空,已跳过")
             continue
 
@@ -130,14 +139,13 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
         # 原样存进 project_no(仅为参考),但不用于任何唯一性验证
         # 唯一主数据是 opportunity_name(机会点名称)
 
-        # 派生字段
-        record["is_signed"] = record.get("confidence") == "已下单"
-        record["is_at_risk"] = record.get("confidence") == "风险"
-
-        # 字符串清理
-        for k, v in record.items():
-            if isinstance(v, str):
-                record[k] = v.strip()
+        # 派生字段(带 strip,避免 Excel 单元格多余空格导致匹配不上)
+        conf = (record.get("confidence") or "").strip() if isinstance(record.get("confidence"), str) else record.get("confidence")
+        record["is_signed"] = conf == "已下单"
+        record["is_at_risk"] = conf == "风险"
+        # 重新写回清理后的 confidence
+        if isinstance(record.get("confidence"), str):
+            record["confidence"] = record["confidence"].strip()
 
         parsed.append(record)
 
