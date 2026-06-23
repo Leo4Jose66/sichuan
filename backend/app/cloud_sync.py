@@ -135,8 +135,6 @@ class SyncService:
         config.settings.cloud_sync_transit_strategy = transit_strategy
         config.settings.cloud_sync_transit_selector = transit_selector
         config.settings.cloud_sync_transit_cookie = transit_cookie
-        # 中转页总是启用(只要有 URL)
-        config.settings.cloud_sync_transit_enabled = bool(transit_url)
         # 重新计算下次运行时间
         self.status.next_run_at = self._calc_next_run()
         return {"success": True, "message": "配置已更新", "config": self.status.to_dict()["config"]}

@@ -361,6 +361,7 @@ from pydantic import BaseModel
 
 class SyncConfigPayload(BaseModel):
     """同步配置 (中转页模式)"""
+    model_config = {"extra": "ignore"}  # 允许额外字段（如旧的 url/token）
     enabled: bool = True
     time: str = "08:30"
     transit_url: str = ""
@@ -381,8 +382,12 @@ def api_sync_trigger(force: bool = Query(False, description="强制下载,忽略
     - force=False: 增量(ETag 没变就跳过)
     - force=True: 强制(忽略缓存,重新下载)
     """
-    result = SyncService.instance().sync_now(force=force)
-    return result
+    try:
+        return SyncService.instance().sync_now(force=force)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"同步触发失败: {type(e).__name__}: {str(e)[:200]}"}
 
 
 @router.get("/api/sync/config")
@@ -394,14 +399,19 @@ def api_sync_get_config():
 @router.put("/api/sync/config")
 def api_sync_update_config(payload: SyncConfigPayload):
     """更新同步配置 (中转页模式)"""
-    return SyncService.instance().update_config(
-        enabled=payload.enabled,
-        time=payload.time,
-        transit_url=payload.transit_url,
-        transit_strategy=payload.transit_strategy,
-        transit_selector=payload.transit_selector,
-        transit_cookie=payload.transit_cookie,
-    )
+    try:
+        return SyncService.instance().update_config(
+            enabled=payload.enabled,
+            time=payload.time,
+            transit_url=payload.transit_url,
+            transit_strategy=payload.transit_strategy,
+            transit_selector=payload.transit_selector,
+            transit_cookie=payload.transit_cookie,
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"保存失败: {type(e).__name__}: {str(e)[:200]}"}
 
 
 @router.post("/api/sync/test")
@@ -427,6 +437,8 @@ def api_sync_test(payload: SyncConfigPayload | None = None):
             "is_xlsx": is_xlsx,
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"success": False, "message": f"中转页测试失败: {type(e).__name__}: {str(e)[:200]}"}
 
 
@@ -483,5 +495,7 @@ def api_sync_inspect(payload: SyncConfigPayload | None = None):
                   if unmatched else f"✅ 所有列都匹配上 field_mapping.yaml",
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"success": False, "message": f"诊断失败: {type(e).__name__}: {str(e)[:200]}"}
 
