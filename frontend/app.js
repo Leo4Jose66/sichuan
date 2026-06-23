@@ -932,12 +932,13 @@ const app = createApp({
             return `<b>${params[0].axisValue}</b><br/>${items}<br/>总计: <b style="color:#C7000B;">${fmt.amount(total)}</b> 万`;
           },
         },
-        legend: { data: ['软件预算', '云资源'], textStyle: { color: '#6b7280' }, top: 0, right: 0, itemGap: 24 },
+        legend: { data: ['云资源', '软件预算'], textStyle: { color: '#374151', fontSize: 12 }, top: 8, right: 16, itemGap: 24 },
+        grid: { left: 60, right: 30, top: 60, bottom: 40 },
         xAxis: {
           type: 'category',
           data: data.map(d => d.key),
           axisLine: { lineStyle: { color: '#d1d5db' } },
-          axisLabel: { color: '#6b7280' },
+          axisLabel: { color: '#6b7280', margin: 16 },
         },
         yAxis: {
           type: 'value',
@@ -948,20 +949,38 @@ const app = createApp({
           splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' } },
         },
         series: [
-          {
-            name: '软件预算',
-            type: 'bar',
-            stack: 'total',
-            data: data.map(d => d.software),
-            itemStyle: { color: '#C7000B', borderRadius: [0, 0, 0, 0] },
-            barWidth: '55%',
-          },
+          // 云资源 - 在柱子底部 - 红色
           {
             name: '云资源',
             type: 'bar',
             stack: 'total',
             data: data.map(d => d.cloud),
-            itemStyle: { color: '#1d4ed8', borderRadius: [4, 4, 0, 0] },
+            itemStyle: { color: '#C7000B', borderRadius: [0, 0, 0, 0] },
+            barWidth: '55%',
+            label: {
+              show: true,
+              position: 'inside',
+              formatter: (p) => fmt.amountW(p.value),
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 600,
+            },
+          },
+          // 软件预算 - 在柱子上部 - 蓝色
+          {
+            name: '软件预算',
+            type: 'bar',
+            stack: 'total',
+            data: data.map(d => d.software),
+            itemStyle: { color: '#1890FF', borderRadius: [4, 4, 0, 0] },
+            label: {
+              show: true,
+              position: 'top',
+              formatter: (p) => fmt.amountW(p.value),
+              color: '#1890FF',
+              fontSize: 11,
+              fontWeight: 600,
+            },
           },
         ],
       });
@@ -1031,8 +1050,8 @@ const app = createApp({
       chartInstances.poHo = chart;
 
       const data = dimPoHo.value.buckets || [];
-      const po = data.find(d => d.key === 'PO') || { count: 0, amount: 0 };
-      const ho = data.find(d => d.key === 'HO') || { count: 0, amount: 0 };
+      const po = data.find(d => d.key === 'PO') || { count: 0, amount: 0, software: 0, cloud: 0 };
+      const ho = data.find(d => d.key === 'HO') || { count: 0, amount: 0, software: 0, cloud: 0 };
 
       chart.setOption({
         ...baseChartOption(),
@@ -1041,25 +1060,37 @@ const app = createApp({
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
           formatter: (params) => {
-            return params.map(p => `${p.marker} ${p.seriesName}<br/>&nbsp;&nbsp;<b>${fmt.amount(p.value)}</b> 万`).join('<br/>');
+            const lines = [];
+            let total = 0;
+            for (const p of params) {
+              if (p.seriesName === '项目数(个)') {
+                lines.push(`${p.marker} 项目数: <b>${p.value}</b> 个`);
+              } else {
+                lines.push(`${p.marker} ${p.seriesName}: <b>${fmt.amount(p.value)}</b> 万`);
+                total += (p.value || 0);
+              }
+            }
+            lines.push(`总计金额: <b style="color:#C7000B;">${fmt.amount(total)}</b> 万`);
+            return `<b>${params[0].axisValue}</b><br/>${lines.join('<br/>')}`;
           },
         },
-        // legend: echarts 自带 - 点击可筛选显示
+        // legend: 上部,与 x 轴文字拉开距离
         legend: {
-          data: ['金额(万)', '项目数(个)'],
+          data: ['项目数(个)', '云资源(万)', '软件预算(万)'],
           textStyle: { color: '#374151', fontSize: 12 },
-          top: 0,
-          right: 10,
-          itemGap: 20,
+          top: 8,
+          right: 16,
+          itemGap: 24,
           itemWidth: 14,
           itemHeight: 10,
         },
-        grid: { left: 50, right: 30, top: 40, bottom: 30 },
+        // grid.top 加大,避免 legend 压住柱子
+        grid: { left: 60, right: 50, top: 60, bottom: 40 },
         xAxis: {
           type: 'category',
           data: ['PO', 'HO'],
           axisLine: { lineStyle: { color: '#d1d5db' } },
-          axisLabel: { color: '#1f2937', fontSize: 14, fontWeight: 600 },
+          axisLabel: { color: '#1f2937', fontSize: 14, fontWeight: 600, margin: 16 },
         },
         yAxis: [
           {
@@ -1080,37 +1111,66 @@ const app = createApp({
           },
         ],
         series: [
-          {
-            name: '金额(万)',
-            type: 'bar',
-            data: [
-              { value: po.amount, itemStyle: { color: '#1890FF', borderRadius: [4, 4, 0, 0] } },  // PO 金额 = 蓝色
-              { value: ho.amount, itemStyle: { color: '#69C0FF', borderRadius: [4, 4, 0, 0] } },  // HO 金额 = 浅蓝
-            ],
-            barWidth: '32%',
-            label: {
-              show: true,
-              position: 'top',
-              color: '#1f2937',
-              fontWeight: 600,
-              formatter: (p) => fmt.amountW(p.value),
-            },
-          },
+          // 1. 项目数 - 单独柱子(PO 蓝, HO 红)
           {
             name: '项目数(个)',
             type: 'bar',
             yAxisIndex: 1,
             data: [
-              { value: po.count, itemStyle: { color: '#52C41A', borderRadius: [4, 4, 0, 0] } },  // PO 项目数 = 绿色
-              { value: ho.count, itemStyle: { color: '#95DE64', borderRadius: [4, 4, 0, 0] } },  // HO 项目数 = 浅绿
+              { value: po.count, itemStyle: { color: '#1890FF', borderRadius: [4, 4, 0, 0] } },  // PO 蓝
+              { value: ho.count, itemStyle: { color: '#C7000B', borderRadius: [4, 4, 0, 0] } },  // HO 华为红
             ],
-            barWidth: '32%',
+            barWidth: '22%',
+            barGap: '30%',
             label: {
               show: true,
               position: 'top',
-              color: '#6b7280',
+              color: '#1f2937',
               fontSize: 11,
+              fontWeight: 600,
               formatter: '{c}个',
+            },
+          },
+          // 2. 云资源 - 堆叠底部(PO 浅蓝, HO 朱红)
+          {
+            name: '云资源(万)',
+            type: 'bar',
+            stack: 'amount',
+            yAxisIndex: 0,
+            data: [
+              { value: po.cloud || 0, itemStyle: { color: '#69C0FF' } },  // PO 浅蓝
+              { value: ho.cloud || 0, itemStyle: { color: '#FF4D4F' } },  // HO 朱红
+            ],
+            barWidth: '22%',
+            barGap: '30%',
+            label: {
+              show: true,
+              position: 'inside',
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 600,
+              formatter: (p) => p.value > 0 ? fmt.amountW(p.value) : '',
+            },
+          },
+          // 3. 软件预算 - 堆叠顶部(PO 深蓝, HO 浅红)
+          {
+            name: '软件预算(万)',
+            type: 'bar',
+            stack: 'amount',
+            yAxisIndex: 0,
+            data: [
+              { value: po.software || 0, itemStyle: { color: '#0050B3' } },  // PO 深蓝
+              { value: ho.software || 0, itemStyle: { color: '#FFA39E' } },  // HO 浅红
+            ],
+            barWidth: '22%',
+            barGap: '30%',
+            label: {
+              show: true,
+              position: 'top',
+              color: '#1f2937',
+              fontSize: 10,
+              fontWeight: 600,
+              formatter: (p) => p.value > 0 ? fmt.amountW(p.value) : '',
             },
           },
         ],
@@ -1120,7 +1180,7 @@ const app = createApp({
         if (params.componentType === 'series' && (params.name === 'PO' || params.name === 'HO')) {
           ElementPlus.ElNotification({
             title: '🚀 正在打开下钻窗口',
-            message: `下钻: po_ho = ${params.name}`,
+            message: '下钻: po_ho = ' + params.name,
             type: 'success',
             duration: 1500,
           });
@@ -1131,11 +1191,12 @@ const app = createApp({
             else if (v && !Array.isArray(v)) search.set(k, v);
           }
           search.set('po_ho', params.name);
-          const url = `${window.location.pathname}?${search.toString()}`;
+          const url = window.location.pathname + '?' + search.toString();
           window.open(url, '_blank');
         }
       });
     };
+
 
     const renderAllCharts = () => {
       renderConfidenceChart();
