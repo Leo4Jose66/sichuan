@@ -1,0 +1,59 @@
+name: Release - Build & Package
+
+on:
+  push:
+    branches: [main]
+    # 只在版本变更时触发(可选)
+    # tags: ['v*']
+
+jobs:
+  build:
+    name: Build Release Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build zip (cross-platform)
+        run: |
+          # 排除运行时不需要的文件
+          zip -r project-pulse.zip . \
+            -x "*/__pycache__/*" \
+            -x "*/.git/*" \
+            -x "*/.pytest_cache/*" \
+            -x "*/data/uploads/*" \
+            -x "*/data/*.db" \
+            -x "*/data/.nfs*" \
+            -x "*/demo-build/*" \
+            -x "*/demo-dist/*" \
+            -x "*/demo-dist-cdn/*" \
+            -x "*/docs/build/*" \
+            -x "*.pyc"
+
+      - name: Get version & date
+        id: meta
+        run: |
+          echo "date=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
+          echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Rename with version
+        run: |
+          mv project-pulse.zip project-pulse-${{ steps.meta.outputs.date }}-${{ steps.meta.outputs.short_sha }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-pulse-release
+          path: project-pulse-*.zip
+          retention-days: 30
+
+      - name: Create GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: project-pulse-*.zip
+          generate_release_notes: true

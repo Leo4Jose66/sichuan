@@ -166,7 +166,7 @@ const app = createApp({
     const recentBatches = ref([]);
 
     // ============ 版本号 ============
-    const appBuild = '20260622-8';  // 变更后需重打包, bust 浏览器缓存
+    const appBuild = '20260623-2';  // 变更后需重打包, bust 浏览器缓存
 
     // ============ 云端同步状态 ============
     const syncStatus = ref({
@@ -177,8 +177,7 @@ const app = createApp({
     });
     const syncConfigVisible = ref(false);
     const syncConfigForm = reactive({
-      url: '', time: '08:30', enabled: true, token: '',
-      mode: 'direct',  // direct | transit
+      time: '08:30', enabled: true,
       transit_url: '', transit_strategy: 'auto', transit_selector: '', transit_cookie: '',
     });
     const syncTick = ref(0);  // 强制刷新计算属性
@@ -244,22 +243,10 @@ const app = createApp({
         ElementPlus.ElMessage.error('同步失败: ' + e.message);
       }
     };
-    const syncNowDialog = () => manualSyncNow(false);
-    // 徽章点击:未配置→打开设置,已配置→触发同步
-    const onSyncBadgeClick = () => {
-      if (!syncStatus.value.config?.url) {
-        openSyncConfig();
-      } else {
-        manualSyncNow(false);
-      }
-    };
     const openSyncConfig = async () => {
-      syncConfigForm.url = syncStatus.value.config?.url || '';
-      syncConfigForm.time = syncStatus.value.config?.time || '08:30';
-      syncConfigForm.enabled = syncStatus.value.config?.enabled ?? true;
-      syncConfigForm.token = '';
       const cfg = syncStatus.value.config || {};
-      syncConfigForm.mode = cfg.transit_enabled ? 'transit' : 'direct';
+      syncConfigForm.time = cfg.time || '08:30';
+      syncConfigForm.enabled = cfg.enabled ?? true;
       syncConfigForm.transit_url = cfg.transit_url || '';
       syncConfigForm.transit_strategy = cfg.transit_strategy || 'auto';
       syncConfigForm.transit_selector = cfg.transit_selector || '';
@@ -269,10 +256,9 @@ const app = createApp({
     };
     const saveSyncConfig = async () => {
       try {
-        // mode -> transit_enabled 转换
         const payload = {
           ...syncConfigForm,
-          transit_enabled: syncConfigForm.mode === 'transit',
+          transit_enabled: true,  // 唯一模式:中转页
         };
         const res = await fetch(`${API_BASE}/api/sync/config`, {
           method: 'PUT',
@@ -292,18 +278,13 @@ const app = createApp({
       }
     };
     const inspectSyncColumns = async () => {
-      const isTransit = syncConfigForm.mode === 'transit';
-      if (isTransit && !syncConfigForm.transit_url) {
+      if (!syncConfigForm.transit_url) {
         ElementPlus.ElMessage.warning('请先填写中转页 URL');
-        return;
-      }
-      if (!isTransit && !syncConfigForm.url) {
-        ElementPlus.ElMessage.warning('请先填写云端地址');
         return;
       }
       syncTestLoading.value = true;
       try {
-        const payload = { ...syncConfigForm, transit_enabled: isTransit };
+        const payload = { ...syncConfigForm, transit_enabled: true };
         const res = await fetch(`${API_BASE}/api/sync/inspect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -343,22 +324,16 @@ const app = createApp({
     };
 
     const testSyncConnection = async () => {
-      const isTransit = syncConfigForm.mode === 'transit';
-      if (isTransit && !syncConfigForm.transit_url) {
+      if (!syncConfigForm.transit_url) {
         ElementPlus.ElMessage.warning('请先填写中转页 URL');
-        return;
-      }
-      if (!isTransit && !syncConfigForm.url) {
-        ElementPlus.ElMessage.warning('请先填写云端地址');
         return;
       }
       syncTestLoading.value = true;
       syncTestResult.value = null;
       try {
-        // mode -> transit_enabled 转换
         const payload = {
           ...syncConfigForm,
-          transit_enabled: isTransit,
+          transit_enabled: true,
         };
         const res = await fetch(`${API_BASE}/api/sync/test`, {
           method: 'POST',
@@ -379,18 +354,18 @@ const app = createApp({
         syncTestLoading.value = false;
       }
     };
-    const syncStatusLabel = computed(() => {
-      // 依赖 syncTick 强制刷新
+    // 同步配置按钮的小字（显示最近同步时间 + 状态）
+    const syncBtnSubtitle = computed(() => {
       void syncTick.value;
       const s = syncStatus.value;
-      if (s.is_running) return '同步中...';
-      if (!s.config?.url) return '云同步未配置';
-      if (!s.last_run_at) return `下次 ${formatSyncTime(s.next_run_at)}`;
-      const t = formatSyncRelative(s.last_run_at);
-      if (s.last_result === 'success') return `${t}同步`;
-      if (s.last_result === 'failed') return `同步失败`;
-      if (s.last_result === 'skipped') return `${t}同步(未变)`;
-      return t;
+      if (s.is_running) return '正在同步...';
+      if (!s.config?.url) return '未配置 · 点此设置';
+      if (s.last_result === 'never') return '未运行';
+      const time = formatSyncTime(s.last_run_at);
+      if (s.last_result === 'success') return `已同步 ${time}`;
+      if (s.last_result === 'failed') return `失败 ${time}`;
+      if (s.last_result === 'skipped') return `未变 ${time}`;
+      return time;
     });
     const syncStatusDotType = computed(() => {
       const s = syncStatus.value;
@@ -481,17 +456,24 @@ const app = createApp({
         }
         if (!DEMO.value || !DEMO.value.projects || forceRefresh) {
           // 先试后端 API - 加 cache: no-store + 时间戳 · 强制跳过浏览器缓存
-          const cacheBuster = forceRefresh ? `?_=${Date.now()}` : '';
-          let res = await fetch(DEMO_DATA + cacheBuster, { cache: 'no-store' });
+          const cacheBuster = forceRefresh ? `?_=${Date.now()}_${Math.random().toString(36).slice(2,8)}` : '';
+          let res = await fetch(DEMO_DATA + cacheBuster, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          });
           if (!res.ok) {
             // 后端不可用 → fallback 到静态数据
             console.info('[Data] 后端不可用,使用静态数据');
-            res = await fetch(DEMO_DATA_FALLBACK + cacheBuster, { cache: 'no-store' });
+            res = await fetch(DEMO_DATA_FALLBACK + cacheBuster, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
           }
           const newData = await res.json();
           if (newData && newData.projects) {
-            DEMO.value = newData;
+            // 重要: 创建新对象,确保 Vue 响应式系统能检测到变化
+            DEMO.value = JSON.parse(JSON.stringify(newData));
             console.info(`[Data] 从后端加载 ${newData.projects.length} 条数据`);
           } else {
             console.warn('[Data] 后端返回数据格式错误,无 projects 字段');
@@ -1263,7 +1245,8 @@ const app = createApp({
     };
 
     const refreshData = async () => {
-      await loadAll();
+      // 强制从后端拉取，不走 localStorage 缓存
+      await loadAll(true);
       ElementPlus.ElMessage.success('数据已刷新');
     };
 
@@ -1413,11 +1396,8 @@ const app = createApp({
     const icons = window.ElementPlusIconsVue || {};
     const Refresh = icons.Refresh;
     const Upload = icons.Upload;
-    const MoreFilled = icons.MoreFilled;
-    const RefreshLeft = icons.RefreshLeft;
     const Search = icons.Search;
     const Cloud = icons.Cloud;
-    const Connection = icons.Connection;
     const Download = icons.Download;
     const UploadFilled = icons.UploadFilled;
     const Back = icons.Back;
@@ -1495,13 +1475,10 @@ const app = createApp({
       syncStatus,
       syncConfigVisible,
       syncConfigForm,
-      syncStatusLabel,
       syncStatusDotType,
       syncTooltip,
       loadSyncStatus,
       manualSyncNow,
-      syncNowDialog,
-      onSyncBadgeClick,
       openSyncConfig,
       saveSyncConfig,
       testSyncConnection,
@@ -1509,6 +1486,7 @@ const app = createApp({
       syncTestResult,
       syncTestLoading,
       formatSyncTime,
+      syncBtnSubtitle,
       appBuild,
       // 筛选辅助
       activeFilterCount,
@@ -1540,30 +1518,38 @@ const app = createApp({
           </div>
         </div>
         <div class="actions">
-          <!-- 云同步状态徽章:未配置时点击进入设置,已配置时触发同步 -->
-          <el-tooltip v-if="!isDrillMode" :content="syncTooltip" placement="bottom">
-            <el-button :type="syncStatusDotType" size="small" plain @click="onSyncBadgeClick" :icon="Cloud" :loading="syncStatus.is_running">
-              <span class="sync-badge">☁️ {{ syncStatusLabel }}</span>
-            </el-button>
-          </el-tooltip>
           <el-button v-if="isDrillMode" @click="goBack" :icon="Back">返回看板</el-button>
-          <el-button v-else @click="refreshData" :icon="Refresh">刷新</el-button>
-          <!-- 数据对接配置按钮:打开 URL/时间/Token 设置 -->
-          <el-button v-if="!isDrillMode" @click="openSyncConfig" :icon="Connection">数据对接</el-button>
-          <el-button v-if="!isDrillMode" type="primary" @click="uploadVisible = true" :icon="Upload">导入 Excel</el-button>
-          <el-dropdown v-if="!isDrillMode">
-            <el-button :icon="MoreFilled">更多</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="manualSyncNow">🔄 立即同步云端</el-dropdown-item>
-                <el-dropdown-item @click="syncConfigVisible = true" divided>⚙️ 云同步设置</el-dropdown-item>
-                <el-dropdown-item @click="exportCSV" divided>📄 导出当前筛选 (CSV)</el-dropdown-item>
-                <el-dropdown-item @click="exportExcel" divided>📊 导出当前筛选 (Excel)</el-dropdown-item>
-                <el-dropdown-item @click="clearDataCache" divided>🗑️ 清除本地缓存</el-dropdown-item>
-                <el-dropdown-item disabled>重置演示数据(仅本地版)</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+          <template v-else>
+            <!-- 同步配置 - 按钮颜色和文字根据同步状态变化 -->
+            <el-tooltip :content="syncTooltip" placement="bottom">
+              <el-button
+                :type="syncStatusDotType"
+                :icon="Cloud"
+                @click="openSyncConfig"
+                :loading="syncStatus.is_running"
+                class="sync-config-btn"
+              >
+                <span class="sync-btn-content">
+                  <span class="sync-btn-title">同步配置</span>
+                  <span class="sync-btn-sub">{{ syncBtnSubtitle }}</span>
+                </span>
+              </el-button>
+            </el-tooltip>
+            <!-- 数据刷新 -->
+            <el-button @click="refreshData" :icon="Refresh">数据刷新</el-button>
+            <!-- 导入数据 -->
+            <el-button type="primary" @click="uploadVisible = true" :icon="Upload">导入数据</el-button>
+            <!-- 导出数据 -->
+            <el-dropdown>
+              <el-button :icon="Download">导出数据</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="exportExcel">📊 导出 Excel (.xlsx)</el-dropdown-item>
+                  <el-dropdown-item @click="exportCSV">📄 导出 CSV</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
         </div>
       </div>
 
@@ -2117,60 +2103,26 @@ const app = createApp({
         </div>
       </el-dialog>
 
-      <!-- ============ 云同步设置对话框 ============ -->
-      <el-dialog v-model="syncConfigVisible" title="☁️ 云同步设置" width="560px" :close-on-click-modal="false">
-        <el-form label-width="110px" size="default">
-          <!-- 模式切换 -->
-          <el-form-item label="同步模式">
-            <el-radio-group v-model="syncConfigForm.mode">
-              <el-radio-button label="direct">🔗 直连下载</el-radio-button>
-              <el-radio-button label="transit">🌐 中转页 (需点击)</el-radio-button>
-            </el-radio-group>
-            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-              <span v-if="syncConfigForm.mode === 'direct'">适合文件直链(OSS/COS/SharePoint 直链等)</span>
-              <span v-else>适合需登录页面/点“下载”按钮才出文件的场景(飞书/钉钉/内网SharePoint)</span>
-            </div>
+      <!-- ============ 同步配置对话框 (中转页模式) ============ -->
+      <el-dialog v-model="syncConfigVisible" title="同步配置" width="520px" :close-on-click-modal="false">
+        <el-form label-width="100px" size="default">
+          <!-- 中转页 URL -->
+          <el-form-item label="中转页 URL">
+            <el-input v-model="syncConfigForm.transit_url" placeholder="https://feishu.cn/wiki/xxxxx 或内网文档页" clearable />
           </el-form-item>
-
-          <!-- 直连模式 -->
-          <template v-if="syncConfigForm.mode === 'direct'">
-            <el-form-item label="云端地址">
-              <el-input v-model="syncConfigForm.url" placeholder="https://example.com/path/to/file.xlsx" clearable />
-              <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-                支持任何 HTTPS/HTTP 直链 · <strong>本机与同内网地址默认直连(绕开系统代理)</strong>
-              </div>
-            </el-form-item>
-            <el-form-item label="访问令牌">
-              <el-input v-model="syncConfigForm.token" type="password" show-password placeholder="可选 · Bearer Token" clearable />
-            </el-form-item>
-          </template>
-
-          <!-- 中转页模式 -->
-          <template v-else>
-            <el-form-item label="中转页 URL">
-              <el-input v-model="syncConfigForm.transit_url" placeholder="https://feishu.cn/wiki/xxxxx 或内网文档页" clearable />
-            </el-form-item>
-            <el-form-item label="查找策略">
-              <el-select v-model="syncConfigForm.transit_strategy" style="width: 100%;">
-                <el-option label="auto (推荐) - 优先找 .xlsx 链接,再找“下载”按钮" value="auto" />
-                <el-option label="text - 找含“下载/导出/Download”文本的按钮" value="text" />
-                <el-option label="selector - 按 CSS 选择器点击(需填下面)" value="selector" />
-              </el-select>
-              <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-                示例：按钮 <code>&lt;button id="download" onclick="downloadFile()"&gt;下载&lt;/button&gt;</code> → 选 <strong>selector</strong>，填 <code>#download</code>
-              </div>
-            </el-form-item>
-            <el-form-item v-if="syncConfigForm.transit_strategy === 'selector'" label="CSS 选择器">
-              <el-input v-model="syncConfigForm.transit_selector" placeholder="如 #download 或 button.download-btn" clearable />
-            </el-form-item>
-            <el-form-item label="预设 Cookie">
-              <el-input v-model="syncConfigForm.transit_cookie" type="password" show-password placeholder="可选 · 需登录页面填 name1=v1; name2=v2" clearable />
-              <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
-                填错会导致下载失败,可留空试试
-              </div>
-            </el-form-item>
-          </template>
-
+          <el-form-item label="查找策略">
+            <el-select v-model="syncConfigForm.transit_strategy" style="width: 100%;">
+              <el-option label="auto (推荐) - 优先找 .xlsx 链接,再找“下载”按钮" value="auto" />
+              <el-option label="text - 找含“下载/导出/Download”文本的按钮" value="text" />
+              <el-option label="selector - 按 CSS 选择器点击(需填下面)" value="selector" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="syncConfigForm.transit_strategy === 'selector'" label="CSS 选择器">
+            <el-input v-model="syncConfigForm.transit_selector" placeholder="如 #download 或 button.download-btn" clearable />
+          </el-form-item>
+          <el-form-item label="预设 Cookie">
+            <el-input v-model="syncConfigForm.transit_cookie" type="password" show-password placeholder="可选 · 需登录页面填 name1=v1; name2=v2" clearable />
+          </el-form-item>
           <el-form-item label="每日同步时间">
             <el-time-picker
               v-model="syncConfigForm.time"
@@ -2183,10 +2135,9 @@ const app = createApp({
           </el-form-item>
           <el-form-item label="启用同步">
             <el-switch v-model="syncConfigForm.enabled" active-text="启用" inactive-text="暂停" inline-prompt />
-            <span style="margin-left: 16px; color: #6b7280; font-size: 12px;">关闭后不再定时同步,但可手动触发</span>
           </el-form-item>
-          <!-- 测试连接结果 -->
-          <el-form-item v-if="syncTestResult" label="连接测试">
+          <!-- 诊断 / 测试 结果 -->
+          <el-form-item v-if="syncTestResult" label="测试结果">
             <el-alert :type="syncTestResult.success ? 'success' : 'error'" :closable="false" show-icon>
               <template #title>
                 {{ syncTestResult.success ? '✅ ' : '❌ ' }}{{ syncTestResult.message }}

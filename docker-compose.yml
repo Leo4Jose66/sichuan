@@ -1,13 +1,35 @@
 version: '3.8'
 
+# ============================================
+# Project Pulse - Docker Compose
+# 一键启动: docker compose up -d
+# 停止:     docker compose down
+# 重启:     docker compose restart
+# 查看日志: docker compose logs -f
+# ============================================
+
 services:
   project-pulse:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: project-pulse
     ports:
-      - "8000:8000"
+      - "8765:8000"  # 宿主机 8765 -> 容器 8000
     volumes:
-      - ./data:/app/data  # 数据库和上传文件持久化
+      - pulse_data:/app/data  # 数据库和上传文件持久化
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+      - PP_CLOUD_SYNC_BROWSER=auto
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  pulse_data:
+    name: project-pulse-data
