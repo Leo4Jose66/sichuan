@@ -673,8 +673,8 @@ const app = createApp({
         total_amount: kpi.value.total_amount,
       };
       dimPartner.value = {
+        // 保留所有伙伴(包含空/斜杠),让筛选器、表格、其它图表都能看到
         buckets: computeDimByField(items, 'partner')
-          .filter(b => b.key && String(b.key).trim())  // 仅过滤空键名
           .sort((a, b) => b.count - a.count),  // 按项目数降序
         total_count: items.length,
         total_amount: kpi.value.total_amount,
@@ -768,6 +768,20 @@ const app = createApp({
     const partnerTableLabel = computed(() => {
       const n = dimPartner.value?.buckets?.length || 0;
       return `伙伴名称${n}（全）`;
+    });
+
+    // 仅在"伙伴贡献项目数 TOP 10"图表中过滤掉空/斜杠伙伴
+    // 其他图表、筛选器、明细表 都保留原始数据
+    const isEmptyPartner = (key) => {
+      if (key === null || key === undefined) return true;
+      const s = String(key).trim();
+      return s === '' || s === '/' || s === '／' || s === '—' || s === '-';
+    };
+    const partnerChartData = computed(() => {
+      const buckets = (dimPartner.value?.buckets || [])
+        .filter(b => !isEmptyPartner(b.key))
+        .slice(0, 10);
+      return buckets;
     });
 
     // 清空列筛选 + 排序
@@ -936,7 +950,7 @@ const app = createApp({
       const chart = echarts.init(el);
       chartInstances.partner = chart;
 
-      const data = (dimPartner.value.buckets || []).slice(0, 10);
+      const data = partnerChartData.value;
 
       chart.setOption({
         ...baseChartOption(),
@@ -1511,6 +1525,7 @@ const app = createApp({
       handleUpload,
       regenerateDemo,
       partnerTableLabel,
+      partnerChartData,
       // 云同步
       syncStatus,
       syncConfigVisible,
@@ -1857,7 +1872,7 @@ const app = createApp({
             </div>
             <div class="chart-body" :ref="el => (chartRefs.partner = el)"></div>
             <!-- 伙伴贡献明细表 -->
-            <el-table :data="dimPartner.buckets.slice(0, 10)" stripe size="small" style="margin-top: 8px; width: 100%;" empty-text="暂无伙伴数据">
+            <el-table :data="partnerChartData" stripe size="small" style="margin-top: 8px; width: 100%;" empty-text="暂无伙伴数据">
               <el-table-column type="index" label="#" width="50" align="center" />
               <el-table-column prop="key" :label="partnerTableLabel" min-width="140" show-overflow-tooltip />
               <el-table-column label="项目数" width="80" align="right" sortable :sort-by="(row) => row.count">
