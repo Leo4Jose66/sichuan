@@ -366,7 +366,7 @@ const app = createApp({
       void syncTick.value;
       const s = syncStatus.value;
       if (s.is_running) return '正在同步...';
-      if (!s.config?.url) return '未配置 · 点此设置';
+      if (!s.config?.transit_url) return '未配置 · 点此设置';
       if (s.last_result === 'never') return '未运行';
       const time = formatSyncTime(s.last_run_at);
       if (s.last_result === 'success') return `已同步 ${time}`;
@@ -377,7 +377,7 @@ const app = createApp({
     const syncStatusDotType = computed(() => {
       const s = syncStatus.value;
       if (s.is_running) return 'primary';
-      if (!s.config?.url) return 'info';
+      if (!s.config?.transit_url) return 'info';
       if (s.last_result === 'failed') return 'danger';
       if (s.last_result === 'success') return 'success';
       return 'info';
@@ -387,7 +387,7 @@ const app = createApp({
       if (s.is_running) return '云端同步进行中...';
       if (!s.config?.url) return '未配置云端地址,点此设置';
       const lines = [];
-      lines.push(`地址: ${s.config.url}`);
+      lines.push(`地址: ${s.config.transit_url || '(未配置)'}`);
       lines.push(`定时: 每日 ${s.config.time}`);
       if (s.next_run_at) lines.push(`下次: ${formatSyncTime(s.next_run_at)}`);
       if (s.last_run_at) {
@@ -675,7 +675,9 @@ const app = createApp({
         total_amount: kpi.value.total_amount,
       };
       dimPartner.value = {
-        buckets: computeDimByField(items, 'partner'),
+        buckets: computeDimByField(items, 'partner')
+          .filter(b => b.key && String(b.key).trim() && b.count > 0)  // 过滤空伙伴
+          .sort((a, b) => b.count - a.count),  // 按项目数降序
         total_count: items.length,
         total_amount: kpi.value.total_amount,
       };
@@ -1026,7 +1028,7 @@ const app = createApp({
             type: 'bar',
             data: [
               { value: po.amount, itemStyle: { color: '#C7000B', borderRadius: [4, 4, 0, 0] } },
-              { value: ho.amount, itemStyle: { color: '#FF4D4F', borderRadius: [4, 4, 0, 0] } },
+              { value: ho.amount, itemStyle: { color: '#FA8C16', borderRadius: [4, 4, 0, 0] } },
             ],
             barWidth: '32%',
             label: {
@@ -1043,7 +1045,7 @@ const app = createApp({
             yAxisIndex: 1,
             data: [
               { value: po.count, itemStyle: { color: 'rgba(199, 0, 11, 0.25)', borderRadius: [4, 4, 0, 0] } },
-              { value: ho.count, itemStyle: { color: 'rgba(255, 77, 79, 0.25)', borderRadius: [4, 4, 0, 0] } },
+              { value: ho.count, itemStyle: { color: 'rgba(250, 140, 22, 0.25)', borderRadius: [4, 4, 0, 0] } },
             ],
             barWidth: '32%',
             label: {
@@ -1150,7 +1152,8 @@ const app = createApp({
     // ============ 筛选下拉辅助：全选 / 清空 / 反选 ============
     const selectAll = (key) => {
       const opts = (filterOptions.value && filterOptions.value[key]) || [];
-      filters[key] = opts.map(o => o.value);
+      // 后端返回的是字符串数组(如 ['PO','HO']) - 直接使用
+      filters[key] = [...opts];
     };
     const selectNone = (key) => {
       filters[key] = [];
@@ -1158,11 +1161,11 @@ const app = createApp({
     const selectInverse = (key) => {
       const opts = (filterOptions.value && filterOptions.value[key]) || [];
       const current = filters[key] || [];
-      filters[key] = opts.map(o => o.value).filter(v => !current.includes(v));
+      filters[key] = opts.filter(v => !current.includes(v));
     };
     const selectAllMonths = () => {
       const months = (filterOptions.value && filterOptions.value.predict_month) || [];
-      filters.predict_month = months.map(o => o.value);
+      filters.predict_month = [...months];
     };
 
     const onPageChange = (page) => {
@@ -1340,6 +1343,21 @@ const app = createApp({
     const goBack = () => {
       // 返回主看板
       window.location.href = window.location.pathname;
+    };
+
+    // 点击顶部 subtile 跳转: 清除过滤,滚动到表格
+    const drillToDim = (dim) => {
+      // 清除所有过滤(若有)
+      Object.keys(filters).forEach(k => {
+        if (Array.isArray(filters[k])) filters[k] = [];
+      });
+      showTableFilters.value = false;
+      activeFilterCount.value = 0;
+      // 滚动到表格
+      setTimeout(() => {
+        const el = document.querySelector('.table-section, .data-table, [data-section=\"detail\"]');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     };
 
     const activeFiltersDisplay = computed(() => {
@@ -1520,7 +1538,16 @@ const app = createApp({
           <div class="logo">🏢</div>
           <div>
             <div class="title">四川云生态机会点项目经营分析看板 <el-tag size="small" type="danger" effect="light" style="margin-left: 8px; vertical-align: middle;">DEMO</el-tag></div>
-            <div class="subtitle">实时掌握项目动态 · 项目数 {{ kpi.total_projects || 0 }} · 总规模 {{ fmt.amount(kpi.total_amount) }} 万 <span v-if="activeFilterCount > 0" style="color: var(--huawei-red);">· {{ activeFilterCount }} 个筛选条件生效</span></div>
+            <div class="subtitle">
+              <a class="sb-link" @click.prevent="drillToDim('')">总项目数 {{ fmt.count(kpi.total_projects) }}</a>
+              ·
+              <a class="sb-link" @click.prevent="drillToDim('')">总项目规模 {{ fmt.amountW(kpi.total_amount) }} 万</a>
+              ·
+              <a class="sb-link" @click.prevent="drillToDim('')">云资源 {{ fmt.amountW(kpi.total_cloud) }} 万</a>
+              ·
+              <a class="sb-link" @click.prevent="drillToDim('')">总软件规模 {{ fmt.amountW(kpi.total_software) }} 万</a>
+              <span v-if="activeFilterCount > 0" style="color: var(--huawei-red); margin-left: 8px;">· {{ activeFilterCount }} 个筛选条件生效</span>
+            </div>
           </div>
         </div>
         <div class="actions">
@@ -1759,12 +1786,6 @@ const app = createApp({
             <div class="kpi-value">{{ fmt.amountW(kpi.total_amount) }}<span class="kpi-unit">万</span></div>
             <div class="kpi-extra">软件 + 云资源</div>
           </div>
-
-          <div class="kpi-card kpi-deployment">
-            <div class="kpi-label">🚀 部署方式种类</div>
-            <div class="kpi-value">{{ dimDeployment.buckets.length }}<span class="kpi-unit">种</span></div>
-            <div class="kpi-extra">最大占比: {{ topDeployment.key }} · {{ topDeployment.pct }}%</div>
-          </div>
         </div>
 
         <!-- 第一行图表:核心维度 -->
@@ -2000,16 +2021,16 @@ const app = createApp({
           <el-table
             ref="tableRef"
             :data="projectList.items"
+            :row-key="row => row.opportunity_name || row.project_no"
             stripe
             v-loading="loading"
             @sort-change="onTableSortChange"
           >
             <el-table-column type="index" label="序号" width="60" align="center" />
-            <el-table-column prop="project_no" label="项目编号" width="130" sortable="custom" show-overflow-tooltip />
-            <el-table-column prop="opportunity_name" label="机会点名称" min-width="180" sortable="custom" show-overflow-tooltip />
+            <el-table-column prop="opportunity_name" label="项目名称" min-width="200" sortable="custom" show-overflow-tooltip />
             <el-table-column prop="customer" label="客户" width="120" sortable="custom" show-overflow-tooltip />
             <el-table-column prop="owner" label="人员" width="100" sortable="custom" />
-            <el-table-column prop="partner" label="伙伴" width="120" sortable="custom" show-overflow-tooltip />
+            <el-table-column prop="partner" label="伙伴名称" width="140" sortable="custom" show-overflow-tooltip />
             <el-table-column prop="industry" label="行业" width="100" sortable="custom" />
             <el-table-column prop="track" label="赛道" width="100" sortable="custom" />
             <el-table-column prop="deployment_mode" label="部署方式" width="110" sortable="custom" />

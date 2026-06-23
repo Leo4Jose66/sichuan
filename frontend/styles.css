@@ -770,6 +770,19 @@ body {
   font-weight: 600;
 }
 
+/* subtitle 中的可点击链接 */
+.sb-link {
+  color: var(--huawei-red);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+.sb-link:hover {
+  opacity: 0.7;
+  text-decoration: underline;
+}
+
 /* 版本号 - 右下角 */
 .pp-version-tag {
   position: fixed;
