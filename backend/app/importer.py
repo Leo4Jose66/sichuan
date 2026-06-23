@@ -68,19 +68,34 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
     print(f"[DEBUG] 表头: {header_row[:10]}...")
     print(f"[DEBUG] 映射表: {list(excel_to_field.keys())[:10]}...")
 
-    # 找到 Excel 列对应的字段索引
+    # 宽容匹配: 如果表头不在映射里, 尝试去掉全/半角括号、空格后重试
+    def normalize_header(h):
+        # 全角() -> 半角(), 全角空格 -> 半角空格
+        s = h.replace('（', '(').replace('）', ')').replace('　', ' ').strip()
+        return s
+
+    # 找到 Excel 列对应的字段索引(同时尝试精确匹配 + 宽容匹配)
     col_index_map = {}  # field_key -> col_index
     for col_idx, header in enumerate(header_row):
+        # 精确匹配
         if header in excel_to_field:
-            field_key = excel_to_field[header]
-            col_index_map[field_key] = col_idx
+            col_index_map[excel_to_field[header]] = col_idx
+            continue
+        # 宽容匹配: 规范化后重试
+        nh = normalize_header(header)
+        for excel_name, field_key in excel_to_field.items():
+            if normalize_header(excel_name) == nh:
+                col_index_map[field_key] = col_idx
+                print(f"[DEBUG] 宽容匹配: '{header}' → '{excel_name}' → {field_key}")
+                break
 
     if not col_index_map:
         # 给个明确的提示，告诉用户哪些列被识别到了
         return [], [
             f"未匹配到任何已知字段。",
-            f"你的 Excel 表头: {header_row[:10]}",
-            f"系统期待的字段: {list(excel_to_field.keys())}",
+            f"你的 Excel 表头({len(header_row)}列): {header_row}",
+            f"系统期待的字段({len(excel_to_field)}个): {list(excel_to_field.keys())}",
+            f"提示:请检查列名是否与系统配置一致(或在 field_mapping.yaml 中添加别名)",
         ]
 
     # 解析数据行

@@ -701,6 +701,15 @@ const app = createApp({
       nextTick(() => renderAllCharts());
     };
 
+    // 关键: 深度监听 filters 和 tableFilters 的变化
+    // Vue3 的 reactive 对嵌套数组的变更追踪有时会丢失, 用 deep:true 强制触发
+    watch(filters, () => {
+      onFilterChange();
+    }, { deep: true });
+    watch(tableFilters, () => {
+      loadProjects(1);
+    }, { deep: true });
+
     const loadProjects = (page = 1) => {
       currentPage.value = page;
       const items = displayedProjects.value;
@@ -769,11 +778,14 @@ const app = createApp({
     };
 
     // 跨页稳定的序号 - 基于原始数据顺序,不随排序变化
-    const indexMethod = (index) => {
-      const page = currentPage.value || projectList.value?.page || 1;
-      const size = projectList.value?.page_size || 20;
-      return (page - 1) * size + index + 1;
-    };
+    // 重要: 用 computed 返回函数, Vue 才能追踪 currentPage 变化, 否则 el-table-column 不会重新计算序号
+    const indexMethod = computed(() => {
+      return (index) => {
+        const page = currentPage.value || projectList.value?.page || 1;
+        const size = projectList.value?.page_size || 20;
+        return (page - 1) * size + index + 1;
+      };
+    });
 
     // 伙伴表格列标题 - 动态显示总伙伴数
     const partnerTableLabel = computed(() => {
@@ -1032,8 +1044,17 @@ const app = createApp({
             return params.map(p => `${p.marker} ${p.seriesName}<br/>&nbsp;&nbsp;<b>${fmt.amount(p.value)}</b> 万`).join('<br/>');
           },
         },
-        legend: { data: ['项目数(个)', '金额(万)'], textStyle: { color: '#6b7280' }, top: 0, right: 0, itemGap: 24 },
-        grid: { left: 50, right: 30, top: 50, bottom: 30 },
+        // legend: echarts 自带 - 点击可筛选显示
+        legend: {
+          data: ['金额(万)', '项目数(个)'],
+          textStyle: { color: '#374151', fontSize: 12 },
+          top: 0,
+          right: 10,
+          itemGap: 20,
+          itemWidth: 14,
+          itemHeight: 10,
+        },
+        grid: { left: 50, right: 30, top: 40, bottom: 30 },
         xAxis: {
           type: 'category',
           data: ['PO', 'HO'],
@@ -1063,8 +1084,8 @@ const app = createApp({
             name: '金额(万)',
             type: 'bar',
             data: [
-              { value: po.amount, itemStyle: { color: '#C7000B', borderRadius: [4, 4, 0, 0] } },
-              { value: ho.amount, itemStyle: { color: '#FA8C16', borderRadius: [4, 4, 0, 0] } },
+              { value: po.amount, itemStyle: { color: '#1890FF', borderRadius: [4, 4, 0, 0] } },  // PO 金额 = 蓝色
+              { value: ho.amount, itemStyle: { color: '#69C0FF', borderRadius: [4, 4, 0, 0] } },  // HO 金额 = 浅蓝
             ],
             barWidth: '32%',
             label: {
@@ -1080,8 +1101,8 @@ const app = createApp({
             type: 'bar',
             yAxisIndex: 1,
             data: [
-              { value: po.count, itemStyle: { color: 'rgba(199, 0, 11, 0.25)', borderRadius: [4, 4, 0, 0] } },
-              { value: ho.count, itemStyle: { color: 'rgba(250, 140, 22, 0.25)', borderRadius: [4, 4, 0, 0] } },
+              { value: po.count, itemStyle: { color: '#52C41A', borderRadius: [4, 4, 0, 0] } },  // PO 项目数 = 绿色
+              { value: ho.count, itemStyle: { color: '#95DE64', borderRadius: [4, 4, 0, 0] } },  // HO 项目数 = 浅绿
             ],
             barWidth: '32%',
             label: {
@@ -1857,19 +1878,6 @@ const app = createApp({
               <div>
                 <div class="card-title">PO vs HO 对比</div>
                 <div class="card-subtitle">金额柱 + 项目数柱</div>
-              </div>
-              <!-- 颜色图例(与柱状图颜色一致) -->
-              <div class="poho-legend">
-                <div class="poho-leg-group">
-                  <span class="poho-leg-title">金额</span>
-                  <span class="poho-leg-po" title="PO 金额柱 #C7000B">▮ PO</span>
-                  <span class="poho-leg-ho" title="HO 金额柱 #FA8C16">▮ HO</span>
-                </div>
-                <div class="poho-leg-group">
-                  <span class="poho-leg-title">项目数</span>
-                  <span class="poho-leg-po-light" title="PO 项目数柱 rgba(199,0,11,0.25)">▮ PO</span>
-                  <span class="poho-leg-ho-light" title="HO 项目数柱 rgba(250,140,22,0.25)">▮ HO</span>
-                </div>
               </div>
             </div>
             <div class="chart-body" :ref="el => (chartRefs.poHo = el)"></div>

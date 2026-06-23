@@ -211,6 +211,35 @@ class SyncService:
             self._record_result("failed", msg, 0, int((time.time()-start)*1000))
             return {"success": False, "message": msg}
 
+        # 保存原始下载文件到调试目录(方便查看下载到的内容是什么)
+        try:
+            from pathlib import Path
+            from .config import settings
+            debug_dir = Path(settings.upload_dir) / "debug"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            ts2 = datetime.now().strftime("%Y%m%d_%H%M%S")
+            debug_file = debug_dir / f"transit_download_{ts2}.xlsx"
+            debug_file.write_bytes(file_bytes)
+            log.info(f"[Sync] 已保存下载文件到 {debug_file} ({len(file_bytes)} bytes)")
+            # 调试: 读取表头打印出来
+            try:
+                import openpyxl, io as _io
+                wb = openpyxl.load_workbook(_io.BytesIO(file_bytes), data_only=True, read_only=True)
+                ws = wb.active
+                first_row = next(ws.iter_rows(values_only=True), None)
+                if first_row:
+                    log.info(f"[Sync] 下载文件表头: {[str(c).strip() if c else '' for c in first_row]}")
+                    # 看第二行内容样本
+                    rows_iter = ws.iter_rows(values_only=True)
+                    next(rows_iter, None)  # 跳过表头
+                    second_row = next(rows_iter, None)
+                    if second_row:
+                        log.info(f"[Sync] 第 2 行样本: {[str(c).strip() if c else '' for c in second_row[:8]]}")
+            except Exception as e2:
+                log.warning(f"[Sync] 读取下载文件调试信息失败: {e2}")
+        except Exception as e_save:
+            log.warning(f"[Sync] 保存调试文件失败: {e_save}")
+
         #  
         try:
             from .database import SessionLocal
@@ -245,12 +274,23 @@ class SyncService:
                 msg = f"Transit sync {inserted} rows, skipped {skipped}"
                 self._record_result("success", msg, inserted, int((time.time()-start)*1000))
                 log.info(f"[Sync] {msg}")
+                # 提取详细错误信息(让用户能看到具体的跳过原因)
+                sync_errors = []
+                if batch.note and "| 解析错误: " in batch.note:
+                    err_str = batch.note.split("| 解析错误: ", 1)[1]
+                    sync_errors = [e.strip() for e in err_str.split(";") if e.strip()]
+                # 如果插入 0 条,在响应里增加诊断信息
+                if inserted == 0:
+                    sample_msg = "未导入任何数据。请检查:(1) 中转页 URL 是否真的下载了 Excel,(2) Excel 表头是否包含 '机会点名称' 列,(3) 数据是否在另一个 sheet 里"
+                    if batch.note:
+                        msg = f"{msg} | {batch.note[:300]} | {sample_msg}"
                 return {
                     "success": True,
                     "message": msg,
                     "inserted": inserted,
                     "skipped": skipped,
                     "sample": sample_dict,
+                    "errors": sync_errors[:20],
                 }
             finally:
                 db.close()
