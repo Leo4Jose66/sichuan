@@ -97,10 +97,8 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
             errors.append(f"第 {row_idx} 行: 机会点名称为空,已跳过")
             continue
 
-        # 必填校验 - 伙伴(以"伙伴名称221(全)"为准)
-        if not record.get("partner"):
-            errors.append(f"第 {row_idx} 行: 伙伴名称为空,已跳过")
-            continue
+        # 伙伴名称允许为空/null/"-"/"/"等,只需入库即可
+        # 前端仅在"伙伴贡献 TOP10"图表中过滤显示
 
         # 金额转换
         for amount_field in ["software_budget", "cloud_budget"]:

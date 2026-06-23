@@ -142,7 +142,7 @@ fields:
   partner:
     excel: "伙伴名称221（全）"
     type: string
-    required: true
+    required: false  # 允许为空/斜杠,仅 TOP10 图表过滤显示
     label: "伙伴名称"
 
   partner_category:
