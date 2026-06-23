@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+
+# Virtual env
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific - 不上传数据库和上传的 Excel
+backend/data/*.db
+backend/data/*.db-journal
+backend/data/.nfs*
+backend/data/uploads/*
+backend/data/uploads/.*
+!backend/data/uploads/.gitkeep
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+
+# Build artifacts
+demo-build/
+demo-dist/
+demo-dist-cdn/
+docs/build/
+
+# Node (if any)
+node_modules/

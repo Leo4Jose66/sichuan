@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  project-pulse:
+    build: .
+    container_name: project-pulse
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data  # 数据库和上传文件持久化
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai

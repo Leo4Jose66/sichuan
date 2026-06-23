@@ -1,0 +1,207 @@
+# ============================================
+# 字段映射配置
+# 业务侧 Excel 加列/改字段名时,只需改这里,无需改代码
+# ============================================
+
+fields:
+  # === 基础信息 ===
+  project_no:
+    excel: "序号"
+    type: string
+    required: true
+    label: "项目编号"
+
+  owner:
+    excel: "人员"
+    type: string
+    label: "负责人"
+
+  # === 金额(万元) ===
+  software_budget:
+    excel: "软件预算规模"
+    type: number
+    unit: "万"
+    label: "软件预算"
+
+  cloud_budget:
+    excel: "云资源量级（w）"
+    type: number
+    unit: "万"
+    label: "云资源预算"
+
+  # === 项目信息 ===
+  handoff_person:
+    excel: "交接人"
+    type: string
+    label: "交接人"
+
+  opportunity_name:
+    excel: "机会点名称"
+    type: string
+    label: "机会点名称"
+
+  deployment_mode:
+    excel: "部署方式"
+    type: string
+    label: "部署方式"
+    # 典型值:独立部署/SAAS/政务云/混合云
+
+  track:
+    excel: "赛道"
+    type: string
+    label: "赛道"
+
+  customer:
+    excel: "客户"
+    type: string
+    label: "客户名称"
+
+  # === 时间 ===
+  predict_month:
+    excel: "预测下单月份"
+    type: string
+    label: "预测下单月份"
+    # 格式:YYYY-MM,例如 2026-07
+
+  # === 状态 ===
+  confidence:
+    excel: "把握度"
+    type: string
+    label: "把握度"
+    # 典型值:关闭/机会/保底/风险/已下单
+
+  stage:
+    excel: "项目阶段"
+    type: string
+    label: "项目阶段"
+    # 典型值:SS1~SS8
+
+  progress_note:
+    excel: "项目进展（每周刷新）"
+    type: string
+    label: "项目进展"
+
+  # === 分类标记 ===
+  in_eco_map:
+    excel: "是否属于133个生态作战地图方案"
+    type: string
+    label: "生态地图"
+    # 是/否
+
+  po_ho:
+    excel: "PO/HO"
+    type: string
+    label: "PO/HO"
+    # PO / HO
+
+  pce_entered:
+    excel: "PCE录入"
+    type: string
+    label: "PCE录入"
+
+  pce_reason:
+    excel: "未录入原因"
+    type: string
+    label: "未录入原因"
+
+  # === 系统字段 ===
+  opp_id:
+    excel: "机会点ID"
+    type: string
+    label: "机会点ID"
+
+  opp_status:
+    excel: "机会点状态"
+    type: string
+    label: "机会点状态"
+
+  # === 业务分类 ===
+  industry:
+    excel: "行业"
+    type: string
+    label: "行业"
+    # 制造/零售/政府/医药/金融/教育/能源等
+
+  scenario:
+    excel: "场景"
+    type: string
+    label: "场景"
+    # AI应用/企业管控/智能客服/数据治理等
+
+  partner:
+    excel: "伙伴名称"
+    type: string
+    label: "伙伴名称"
+
+  standard_solution:
+    excel: "标准方案名称"
+    type: string
+    label: "标准方案名称"
+
+  risk_note:
+    excel: "风险及求助"
+    type: string
+    label: "风险"
+
+
+# ============================================
+# 派生字段(不由 Excel 直接提供,系统计算)
+# ============================================
+derived:
+  scale_amount:
+    formula: "software_budget + cloud_budget"
+    label: "项目总规模(万)"
+    unit: "万"
+
+  is_signed:
+    formula: "confidence == '已下单'"
+    label: "是否已签单"
+
+  is_at_risk:
+    formula: "confidence == '风险'"
+    label: "是否风险项目"
+
+
+# ============================================
+# 维度字典(报表分析的分组维度)
+# ============================================
+dimensions:
+  confidence:
+    label: "把握度"
+    field: confidence
+    order:
+      - 已下单
+      - 保底
+      - 机会
+      - 风险
+      - 关闭
+
+  time:
+    label: "时间(预测下单月份)"
+    field: predict_month
+    granularity: month
+
+  partner:
+    label: "伙伴"
+    field: partner
+
+  po_ho:
+    label: "PO/HO"
+    field: po_ho
+    order: [PO, HO]
+
+  industry:
+    label: "行业"
+    field: industry
+
+  track:
+    label: "赛道"
+    field: track
+
+  deployment_mode:
+    label: "部署方式"
+    field: deployment_mode
+
+  stage:
+    label: "项目阶段"
+    field: stage

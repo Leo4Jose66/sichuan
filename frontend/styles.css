@@ -1,0 +1,786 @@
+/* ============================
+   Project Pulse - 全局样式
+   设计语言:浅色商务风 + 华为红强调色
+   ============================ */
+
+:root {
+  /* 主色调 - 白色背景 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f7fa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafbfc;
+  --bg-header: #ffffff;
+
+  /* 文字 */
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+
+  /* 华为红 - 主强调色 */
+  --huawei-red: #C7000B;        /* 主红 */
+  --huawei-red-dark: #A60000;   /* 深红 */
+  --huawei-red-light: #FF4D4F;  /* 浅红 */
+  --huawei-red-bg: #FFF1F0;     /* 红色背景 */
+
+  /* 辅助色 */
+  --accent-blue: #1d4ed8;
+  --accent-cyan: #0891b2;
+  --accent-amber: #d97706;
+
+  /* 把握度配色(适配白底) */
+  --color-signed: #059669;      /* 已下单 - 绿 */
+  --color-guaranteed: #1d4ed8;  /* 保底 - 深蓝 */
+  --color-opportunity: #d97706; /* 机会 - 橙 */
+  --color-risk: #dc2626;        /* 风险 - 红 */
+  --color-closed: #6b7280;      /* 关闭 - 灰 */
+
+  /* 边框/分割 */
+  --border: #e5e7eb;
+  --border-light: #d1d5db;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* 强调光晕 - 华为红 */
+  --glow-red: 0 4px 12px rgba(199, 0, 11, 0.25);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* ============================
+   顶部导航
+   ============================ */
+.app-header {
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-header .logo {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--huawei-red) 0%, var(--huawei-red-dark) 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 20px;
+  color: white;
+  box-shadow: var(--glow-red);
+}
+
+.app-header .title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.app-header .subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.app-header .actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* Element Plus 按钮主色覆盖 */
+.app-header .el-button--primary {
+  background-color: var(--huawei-red);
+  border-color: var(--huawei-red);
+}
+.app-header .el-button--primary:hover {
+  background-color: var(--huawei-red-dark);
+  border-color: var(--huawei-red-dark);
+}
+
+/* ============================
+   主体布局
+   ============================ */
+.main-content {
+  padding: 24px 32px;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* ============================
+   KPI 卡
+   ============================ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1280px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 部署方式报告 */
+.deployment-report {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 1280px) {
+  .deployment-report { grid-template-columns: 1fr; }
+}
+
+/* 面包屑 / 下钻提示条 */
+.breadcrumb-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--huawei-red);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.breadcrumb-bar .crumb {
+  color: var(--accent-blue);
+  cursor: pointer;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.breadcrumb-bar .crumb:hover { background: var(--huawei-red-bg); }
+.breadcrumb-bar .crumb.active {
+  color: var(--huawei-red);
+  font-weight: 600;
+  cursor: default;
+}
+.breadcrumb-bar .crumb.active:hover { background: transparent; }
+.breadcrumb-bar .crumb-sep {
+  color: var(--text-muted);
+  font-weight: 300;
+}
+.breadcrumb-bar .crumb-tip {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.breadcrumb-bar kbd {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text-primary);
+}
+
+/* 筛选条件 chips */
+.filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.filter-chips .chip-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.filter-chips .filter-chip {
+  font-size: 13px;
+  padding: 4px 10px;
+  height: auto;
+}
+
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--huawei-red);
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--huawei-red);
+}
+
+/* 各 KPI 顶部色条 - 全部用华为红作为主色调,辅以颜色点缀 */
+.kpi-card.kpi-total::before { background: linear-gradient(90deg, var(--huawei-red), var(--huawei-red-dark)); }
+.kpi-card.kpi-software::before { background: var(--accent-blue); }
+.kpi-card.kpi-cloud::before { background: var(--accent-cyan); }
+.kpi-card.kpi-scale::before { background: linear-gradient(90deg, var(--accent-blue), var(--huawei-red)); }
+.kpi-card.kpi-deployment::before { background: var(--accent-amber); }
+
+.kpi-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-unit {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+
+.kpi-extra {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kpi-extra .up { color: var(--color-signed); font-weight: 500; }
+.kpi-extra .down { color: var(--color-risk); font-weight: 500; }
+
+/* ============================
+   图表网格
+   ============================ */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-card .card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.chart-card .card-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.chart-card .chart-body {
+  flex: 1;
+  min-height: 300px;
+}
+
+.col-3 { grid-column: span 3; }
+.col-4 { grid-column: span 4; }
+.col-6 { grid-column: span 6; }
+.col-8 { grid-column: span 8; }
+.col-12 { grid-column: span 12; }
+
+@media (max-width: 1280px) {
+  .col-3 { grid-column: span 6; }
+  .col-4 { grid-column: span 6; }
+}
+
+@media (max-width: 768px) {
+  .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; }
+}
+
+/* ============================
+   筛选器
+   ============================ */
+.filter-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-bar .filter-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-right: 4px;
+  font-weight: 500;
+}
+
+.filter-bar .filter-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* Element Plus 筛选区按钮主题色覆盖 */
+.filter-bar .el-button--primary {
+  background-color: var(--huawei-red);
+  border-color: var(--huawei-red);
+}
+.filter-bar .el-button--primary:hover {
+  background-color: var(--huawei-red-dark);
+  border-color: var(--huawei-red-dark);
+}
+
+/* ============================
+   明细表
+   ============================ */
+.detail-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-card .detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-card .detail-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.amount-cell {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* ============================
+   把握度标签 - 白底配色
+   ============================ */
+.tag-signed { background: rgba(5, 150, 105, 0.1); color: var(--color-signed); border-color: var(--color-signed); }
+.tag-guaranteed { background: rgba(29, 78, 216, 0.1); color: var(--color-guaranteed); border-color: var(--color-guaranteed); }
+.tag-opportunity { background: rgba(217, 119, 6, 0.1); color: var(--color-opportunity); border-color: var(--color-opportunity); }
+.tag-risk { background: rgba(220, 38, 38, 0.1); color: var(--color-risk); border-color: var(--color-risk); }
+.tag-closed { background: rgba(107, 114, 128, 0.1); color: var(--color-closed); border-color: var(--color-closed); }
+
+/* ============================
+   滚动条
+   ============================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--huawei-red);
+}
+
+/* ============================
+   Element Plus 浅色主题适配
+   ============================ */
+
+/* 表格 */
+.el-table {
+  --el-table-bg-color: var(--bg-card) !important;
+  --el-table-tr-bg-color: var(--bg-card) !important;
+  --el-table-header-bg-color: var(--bg-secondary) !important;
+  --el-table-row-hover-bg-color: var(--huawei-red-bg) !important;
+  --el-table-border-color: var(--border) !important;
+  --el-table-text-color: var(--text-primary) !important;
+  --el-table-header-text-color: var(--text-secondary) !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 分页 */
+.el-pagination .btn-next, .el-pagination .btn-prev, .el-pager li {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.el-pagination .el-pager li.is-active {
+  background-color: var(--huawei-red) !important;
+  color: white !important;
+}
+
+/* 上传区域 */
+.el-upload-dragger {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-light) !important;
+}
+.el-upload-dragger:hover {
+  border-color: var(--huawei-red) !important;
+  background: var(--huawei-red-bg) !important;
+}
+
+.el-button {
+  font-weight: 500;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  color: var(--text-secondary);
+}
+
+/* 弹窗 */
+.el-dialog {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.el-dialog__header {
+  background: var(--bg-secondary);
+  padding: 16px 20px;
+  margin-right: 0 !important;
+}
+
+.el-dialog__title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* 输入框聚焦 - 华为红 */
+.el-input__wrapper.is-focus, .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--huawei-red) inset !important;
+}
+
+/* Tag 圆角 */
+.el-tag {
+  border-radius: 4px;
+}
+
+/* ============ 加载骨架屏 ============ */
+.app-skeleton {
+  padding: 16px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.skel-header { margin-bottom: 20px; }
+.skel-bar {
+  height: 14px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s infinite;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.skel-bar-lg { width: 40%; height: 24px; }
+.skel-bar-md { width: 60%; height: 12px; }
+.skel-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.skel-card { height: 90px; background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skel-shimmer 1.4s infinite; border-radius: 6px; }
+.skel-charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.skel-chart { height: 320px; background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skel-shimmer 1.4s infinite; border-radius: 6px; }
+@keyframes skel-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ============ 错误降级提示 ============ */
+.app-error {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  background: #fff;
+  z-index: 9999;
+  text-align: center;
+  padding: 40px;
+}
+.app-error h1 { color: var(--huawei-red); margin: 0; }
+.app-error p { color: #666; max-width: 500px; }
+.app-error button {
+  padding: 8px 24px;
+  background: var(--huawei-red);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ============ 响应式适配 ============ */
+/* 平板 */
+@media (max-width: 1280px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .chart-grid { grid-template-columns: 1fr !important; }
+}
+/* 手机 */
+@media (max-width: 768px) {
+  body { font-size: 13px; }
+  .app-header { padding: 12px !important; flex-wrap: wrap; }
+  .brand .title { font-size: 14px !important; }
+  .brand .subtitle { font-size: 11px !important; }
+  .main-content { padding: 8px !important; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .chart-grid { grid-template-columns: 1fr !important; }
+  .filter-bar { flex-wrap: wrap; gap: 6px; }
+  .filter-bar > * { margin-bottom: 4px; }
+  .table-col-filters { flex-wrap: wrap; }
+  .skel-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+  .skel-charts { grid-template-columns: 1fr !important; }
+}
+
+/* ============ 全局字体规范 ============ */
+:root {
+  --font-size-xs: 11px;   /* 辅助信息 (如时间戳) */
+  --font-size-sm: 12px;   /* 二级文本 (如 filter 输入 placeholder、表格副文) */
+  --font-size-base: 13px; /* 正文 (filter-bar 标签等) */
+  --font-size-md: 14px;   /* 主要文本 (KPI 数字中小、列名) */
+  --font-size-lg: 16px;   /* 强调 (表格列名) */
+  --font-size-xl: 20px;   /* 标题 (KPI 数字) */
+  --font-size-2xl: 28px;  /* 主标题 */
+  --font-size-3xl: 32px;  /* 超大标题 */
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+}
+body {
+  font-size: var(--font-size-base);
+  color: #1f2937;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+/* 统一表头、列名、KPI 标签的字号 */
+.app-header .title { font-size: var(--font-size-2xl) !important; font-weight: var(--font-weight-bold) !important; }
+.app-header .subtitle { font-size: var(--font-size-sm) !important; }
+.kpi-label { font-size: var(--font-size-base) !important; }
+.kpi-value { font-size: var(--font-size-2xl) !important; font-weight: var(--font-weight-bold) !important; }
+.kpi-extra { font-size: var(--font-size-xs) !important; }
+.card-title { font-size: var(--font-size-md) !important; font-weight: var(--font-weight-semibold) !important; }
+.card-subtitle { font-size: var(--font-size-xs) !important; }
+.detail-title { font-size: var(--font-size-lg) !important; font-weight: var(--font-weight-semibold) !important; }
+.el-table th.el-table__cell > .cell { font-size: var(--font-size-md) !important; font-weight: var(--font-weight-semibold) !important; }
+.el-table td.el-table__cell > .cell { font-size: var(--font-size-base) !important; }
+.filter-bar { font-size: var(--font-size-base); }
+.filter-bar .el-input__inner,
+.filter-bar .el-select__placeholder { font-size: var(--font-size-sm) !important; }
+.el-button { font-size: var(--font-size-sm) !important; }
+.el-button--small { font-size: var(--font-size-xs) !important; }
+
+/* ============ 顶部横向筛选栏（与表格列对齐） ============ */
+.tbl-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  gap: 0;
+  padding: 6px 0;
+  background: #fafbfc;
+  border-top: 2px solid var(--huawei-red);
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0;
+  overflow-x: auto;
+  min-height: 48px;
+}
+.tbl-filter-bar .tf-cell {
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.tbl-filter-bar .el-input,
+.tbl-filter-bar .el-select {
+  width: 100%;
+}
+.tbl-filter-bar .el-input__wrapper {
+  padding: 2px 6px !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 1px #d1d5db inset !important;
+}
+.tbl-filter-bar .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--huawei-red) inset !important;
+}
+.tbl-filter-bar .el-input__inner {
+  font-size: var(--font-size-sm) !important;
+  height: 24px !important;
+}
+.tbl-filter-bar .el-select .el-select__placeholder {
+  font-size: var(--font-size-sm) !important;
+  color: #9ca3af;
+}
+.tbl-filter-bar .el-select__tags {
+  max-width: 80px !important;
+  overflow: hidden;
+}
+
+/* ============ 列头内嵌筛选按钮(旧版本预留) ============ */
+/* 列头:标题+筛选按钮横向排列 */
+.col-hdr {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: space-between;
+  width: 100%;
+}
+/* 筛选图标按钮 */
+.hdr-filter-btn {
+  padding: 2px 3px !important;
+  min-height: unset !important;
+  line-height: 1;
+  color: #bbb !important;
+  font-size: 12px;
+}
+.hdr-filter-btn:hover,
+.hdr-filter-btn.active {
+  color: var(--huawei-red) !important;
+}
+.hdr-filter-btn.active {
+  background: #fef0f0;
+  border-radius: 3px;
+}
+.hdr-filter-btn .el-icon {
+  font-size: 12px;
+}
+
+/* 筛选弹窗 */
+.hdr-filter-pop {
+  padding: 6px !important;
+}
+.hdr-filter-pop .el-popper__arrow {
+  display: none;
+}
+.hdr-filter-pop .el-input,
+.hdr-filter-pop .el-select {
+  width: 100%;
+}
+.hdr-filter-pop .el-input__wrapper {
+  padding: 2px 8px !important;
+}
+.hdr-filter-pop .el-select__tags {
+  max-width: 130px !important;
+}
+
+
+/* 导入结果中"已跳过"行高亮 */
+.skipped-item {
+  color: #dc2626 !important;
+  font-weight: 600;
+}
+
+/* 版本号 - 右下角 */
+.pp-version-tag {
+  position: fixed;
+  right: 12px;
+  bottom: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+  background: rgba(255,255,255,0.85);
+  padding: 2px 8px;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 100;
+  user-select: text;
+}
