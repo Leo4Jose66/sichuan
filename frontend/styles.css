@@ -146,10 +146,11 @@ html, body {
    ============================ */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
+.kpi-card { cursor: pointer; }
 
 @media (max-width: 1280px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
@@ -782,6 +783,40 @@ body {
   opacity: 0.7;
   text-decoration: underline;
 }
+
+/* POHO 模块右上角颜色图例 */
+.poho-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  font-size: 12px;
+}
+.poho-leg-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+}
+.poho-leg-title {
+  font-weight: 600;
+  min-width: 42px;
+  text-align: right;
+  color: #374151;
+}
+.poho-leg-po,
+.poho-leg-ho,
+.poho-leg-po-light,
+.poho-leg-ho-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 600;
+}
+.poho-leg-po { color: #C7000B; }
+.poho-leg-ho { color: #FA8C16; }
+.poho-leg-po-light { color: rgba(199, 0, 11, 0.6); }
+.poho-leg-ho-light { color: rgba(250, 140, 22, 0.6); }
 
 /* 版本号 - 右下角 */
 .pp-version-tag {

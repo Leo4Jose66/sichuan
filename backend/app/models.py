@@ -51,6 +51,7 @@ class Project(Base):
     industry = Column(String(64), index=True, comment="行业")
     scenario = Column(String(128), comment="场景")
     partner = Column(String(128), index=True, comment="伙伴名称")
+    partner_category = Column(String(128), comment="伙伴类型")
     standard_solution = Column(String(255), comment="标准方案名称")
     risk_note = Column(Text, comment="风险及求助")
 
@@ -96,6 +97,7 @@ class Project(Base):
             "industry": self.industry,
             "scenario": self.scenario,
             "partner": self.partner,
+            "partner_category": self.partner_category,
             "standard_solution": self.standard_solution,
             "risk_note": self.risk_note,
             "is_signed": self.is_signed,

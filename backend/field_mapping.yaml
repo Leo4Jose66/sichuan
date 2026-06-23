@@ -2,13 +2,20 @@
 # 字段映射配置
 # 业务侧 Excel 加列/改字段名时,只需改这里,无需改代码
 # ============================================
+# 你的 Excel 列顺序(25 列):
+#   序号 / 人员 / 软件预算规模 / 云资源量级（w）/ 整体规模 / 机会点名称
+#   部署方式 / 赛道 / 客户 / 预测下单月份 / 把握度 / 项目阶段
+#   项目进展（每周刷新）/ 是否属于133个生态作战地图方案 / PO/HO / PCE录入
+#   未录入原因 / 机会点ID / 机会点状态 / 行业 / 场景 / 伙伴
+#   伙伴名称221（全）/ 标准方案名称 / 风险及求助
+# ============================================
 
 fields:
   # === 基础信息 ===
   project_no:
     excel: "序号"
     type: string
-    required: true
+    required: false  # 不强制,系统自动生成也行
     label: "项目编号"
 
   owner:
@@ -29,22 +36,25 @@ fields:
     unit: "万"
     label: "云资源预算"
 
-  # === 项目信息 ===
-  handoff_person:
-    excel: "交接人"
-    type: string
-    label: "交接人"
+  # === 整体规模(Excel 直接提供,不再用公式推导) ===
+  scale_amount:
+    excel: "整体规模"
+    type: number
+    unit: "万"
+    label: "项目总规模"
+    required: false  # 缺这个字段时,系统会用 software + cloud 兜底
 
+  # === 项目信息 ===
   opportunity_name:
     excel: "机会点名称"
     type: string
+    required: true
     label: "机会点名称"
 
   deployment_mode:
     excel: "部署方式"
     type: string
     label: "部署方式"
-    # 典型值:独立部署/SAAS/政务云/混合云
 
   track:
     excel: "赛道"
@@ -68,7 +78,6 @@ fields:
     excel: "把握度"
     type: string
     label: "把握度"
-    # 典型值:关闭/机会/保底/风险/已下单
 
   stage:
     excel: "项目阶段"
@@ -120,18 +129,27 @@ fields:
     excel: "行业"
     type: string
     label: "行业"
-    # 制造/零售/政府/医药/金融/教育/能源等
 
   scenario:
     excel: "场景"
     type: string
     label: "场景"
-    # AI应用/企业管控/智能客服/数据治理等
 
+  # === 伙伴 ===
+  # 注意:Excel 里有"伙伴"和"伙伴名称221（全）"两列
+  # "伙伴名称221（全）"是真正的伙伴名称(括号里 221 是总伙伴数)
+  # "伙伴"是伙伴分类/类型(可选)
   partner:
-    excel: "伙伴名称"
+    excel: "伙伴名称221（全）"
     type: string
+    required: true
     label: "伙伴名称"
+
+  partner_category:
+    excel: "伙伴"
+    type: string
+    required: false
+    label: "伙伴类型"
 
   standard_solution:
     excel: "标准方案名称"
@@ -141,16 +159,18 @@ fields:
   risk_note:
     excel: "风险及求助"
     type: string
-    label: "风险"
+    label: "风险及求助"
 
 
 # ============================================
 # 派生字段(不由 Excel 直接提供,系统计算)
 # ============================================
 derived:
-  scale_amount:
+  # scale_amount 现在从 Excel 直接读取,不再是派生
+  # 仅在 Excel 缺这一列时用此公式兜底
+  scale_amount_fallback:
     formula: "software_budget + cloud_budget"
-    label: "项目总规模(万)"
+    label: "项目总规模(兜底公式)"
     unit: "万"
 
   is_signed:

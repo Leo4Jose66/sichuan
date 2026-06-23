@@ -91,10 +91,15 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
             if col_idx < len(row):
                 record[field_key] = row[col_idx]
 
-        # 必填校验
-        project_no = record.get("project_no")
-        if not project_no:
-            errors.append(f"第 {row_idx} 行: 项目编号为空,已跳过")
+        # 必填校验 - 以机会点名称为主(项目编号只是序号,可空)
+        opportunity_name = record.get("opportunity_name")
+        if not opportunity_name:
+            errors.append(f"第 {row_idx} 行: 机会点名称为空,已跳过")
+            continue
+
+        # 必填校验 - 伙伴(以"伙伴名称221(全)"为准)
+        if not record.get("partner"):
+            errors.append(f"第 {row_idx} 行: 伙伴名称为空,已跳过")
             continue
 
         # 金额转换
@@ -109,10 +114,25 @@ def parse_excel(file_bytes: bytes) -> tuple[list[dict], list[str]]:
                     errors.append(f"第 {row_idx} 行: {amount_field} 无法转换为数字({val})，已设为 0 但仍导入")
                     record[amount_field] = 0.0
 
+        # scale_amount: 优先用 Excel 中的"整体规模",缺则公式兑底
+        scale_val = record.get("scale_amount")
+        if scale_val is None or scale_val == "":
+            record["scale_amount"] = round(
+                (record.get("software_budget") or 0) + (record.get("cloud_budget") or 0), 2
+            )
+        else:
+            try:
+                record["scale_amount"] = float(scale_val)
+            except (ValueError, TypeError):
+                record["scale_amount"] = round(
+                    (record.get("software_budget") or 0) + (record.get("cloud_budget") or 0), 2
+                )
+
+        # 注意:Excel 中的"序号"列只是行号,不是项目编号
+        # 原样存进 project_no(仅为参考),但不用于任何唯一性验证
+        # 唯一主数据是 opportunity_name(机会点名称)
+
         # 派生字段
-        record["scale_amount"] = round(
-            (record.get("software_budget") or 0) + (record.get("cloud_budget") or 0), 2
-        )
         record["is_signed"] = record.get("confidence") == "已下单"
         record["is_at_risk"] = record.get("confidence") == "风险"
 

@@ -115,7 +115,7 @@ const app = createApp({
     // ============ 明细表列筛选 + 排序状态 ============
     const showTableFilters = ref(true);  // 列筛选行默认展开
     const tableFilters = reactive({
-      project_no: [], opportunity_name: [], customer: [], owner: [],
+      opportunity_name: [], customer: [], owner: [],
       partner: [], industry: [], track: [], deployment_mode: [], stage: [],
       confidence: [], po_ho: [], predict_month: [],
     });  // 每列筛选值(数组:多选值;空数组+无其他key:未筛选)
@@ -124,11 +124,10 @@ const app = createApp({
 
     // 列定义 - 统一管理项目明细表列名(用于动态筛选、排序、显示)
     const TABLE_COLUMNS = [
-      { key: 'project_no', label: '项目编号', type: 'string' },
-      { key: 'opportunity_name', label: '机会点名称', type: 'string' },
+      { key: 'opportunity_name', label: '项目名称', type: 'string' },
       { key: 'customer', label: '客户', type: 'string' },
       { key: 'owner', label: '人员', type: 'string' },
-      { key: 'partner', label: '伙伴', type: 'string' },
+      { key: 'partner', label: '伙伴名称', type: 'string' },
       { key: 'industry', label: '行业', type: 'string' },
       { key: 'track', label: '赛道', type: 'string' },
       { key: 'deployment_mode', label: '部署方式', type: 'string' },
@@ -145,7 +144,7 @@ const app = createApp({
     const filterOptions = ref({});
 
     // 项目明细
-    const projectList = ref({ items: [], total: 0, page: 1, page_size: 50 });
+    const projectList = ref({ items: [], total: 0, page: 1, page_size: 20 });
 
     // ECharts 实例 - 使用函数 ref避免 Vue 覆盖 ref 对象
     const chartRefs = {
@@ -206,13 +205,13 @@ const app = createApp({
             ElementPlus.ElMessage.success(data.message);
           } else {
             // 展示示例行 - 让用户看到实际导入的是什么
-            if (data.sample && data.sample.project_no) {
+            if (data.sample && data.sample.opportunity_name) {
               const s = data.sample;
               ElementPlus.ElMessageBox.alert(
                 `<div style="font-size:13px;line-height:1.7;">
                   <b>同步成功 · 示例数据 (1/共 ${data.inserted} 条):</b><br>
                   <hr>
-                  <b>项目编号:</b> ${s.project_no || '—'}<br>
+                  <b>项目名称:</b> ${s.opportunity_name || '—'}<br>
                   <b>机会名称:</b> ${s.opportunity_name || '—'}<br>
                   <b>客户:</b> ${s.customer || '—'}<br>
                   <b>负责人:</b> ${s.owner || '—'}<br>
@@ -535,8 +534,7 @@ const app = createApp({
         const k = filters.keyword.toLowerCase();
         items = items.filter(p =>
           (p.opportunity_name || '').toLowerCase().includes(k) ||
-          (p.customer || '').toLowerCase().includes(k) ||
-          (p.project_no || '').toLowerCase().includes(k)
+          (p.customer || '').toLowerCase().includes(k)
         );
       }
       return items;
@@ -676,7 +674,7 @@ const app = createApp({
       };
       dimPartner.value = {
         buckets: computeDimByField(items, 'partner')
-          .filter(b => b.key && String(b.key).trim() && b.count > 0)  // 过滤空伙伴
+          .filter(b => b.key && String(b.key).trim())  // 仅过滤空键名
           .sort((a, b) => b.count - a.count),  // 按项目数降序
         total_count: items.length,
         total_amount: kpi.value.total_amount,
@@ -758,6 +756,19 @@ const app = createApp({
       sortOrder.value = order || '';
       loadProjects(1);
     };
+
+    // 跨页稳定的序号 - 基于原始数据顺序,不随排序变化
+    const indexMethod = (index) => {
+      const page = projectList.value?.page || 1;
+      const size = projectList.value?.page_size || 20;
+      return (page - 1) * size + index + 1;
+    };
+
+    // 伙伴表格列标题 - 动态显示总伙伴数
+    const partnerTableLabel = computed(() => {
+      const n = dimPartner.value?.buckets?.length || 0;
+      return `伙伴名称${n}（全）`;
+    });
 
     // 清空列筛选 + 排序
     const clearTableState = () => {
@@ -1163,10 +1174,8 @@ const app = createApp({
       const current = filters[key] || [];
       filters[key] = opts.filter(v => !current.includes(v));
     };
-    const selectAllMonths = () => {
-      const months = (filterOptions.value && filterOptions.value.predict_month) || [];
-      filters.predict_month = [...months];
-    };
+    // 保留别名(selectAllMonths 为 selectAll('predict_month') 的别名,兼容旧调用)
+    const selectAllMonths = () => selectAll('predict_month');
 
     const onPageChange = (page) => {
       loadProjects(page);
@@ -1187,9 +1196,10 @@ const app = createApp({
         );
       }
 
-      const headers = ['项目编号','机会点名称','客户','负责人','伙伴','行业','赛道','部署方式','把握度','项目阶段','PO/HO','预测下单月份','软件预算(万)','云资源(万)','总规模(万)','项目进展','风险'];
-      const rows = items.map(p => [
-        p.project_no, p.opportunity_name, p.customer, p.owner, p.partner,
+      const headers = ['序号','机会点名称','客户','负责人','伙伴名称','行业','赛道','部署方式','把握度','项目阶段','PO/HO','预测下单月份','软件预算(万)','云资源(万)','总规模(万)','项目进展','风险'];
+      const rows = items.map((p, i) => [
+        i + 1,  // 序号 - 导出时的行号
+        p.opportunity_name, p.customer, p.owner, p.partner,
         p.industry, p.track, p.deployment_mode, p.confidence, p.stage,
         p.po_ho, p.predict_month,
         p.software_budget, p.cloud_budget, p.scale_amount,
@@ -1226,10 +1236,11 @@ const app = createApp({
         if (cleaned.length > 0) items = items.filter(p => cleaned.some(v => String(p[k] || '').includes(String(v))));
       }
       // 生成 HTML 表格（Excel 可读）
-      const headers = ['项目编号','机会点名称','客户','负责人','伙伴','行业','赛道','部署方式','把握度','项目阶段','PO/HO','预测下单月份','软件预算(万)','云资源(万)','总规模(万)','项目进展','风险'];
+      const headers = ['序号','机会点名称','客户','负责人','伙伴名称','行业','赛道','部署方式','把握度','项目阶段','PO/HO','预测下单月份','软件预算(万)','云资源(万)','总规模(万)','项目进展','风险'];
       const esc = (s) => (s ?? '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const rows = items.map(p => '<tr>' + [
-        p.project_no, p.opportunity_name, p.customer, p.owner, p.partner,
+      const rows = items.map((p, i) => '<tr>' + [
+        i + 1,  // 序号 - 导出时的行号
+        p.opportunity_name, p.customer, p.owner, p.partner,
         p.industry, p.track, p.deployment_mode, p.confidence, p.stage,
         p.po_ho, p.predict_month,
         p.software_budget, p.cloud_budget, p.scale_amount,
@@ -1352,18 +1363,22 @@ const app = createApp({
         if (Array.isArray(filters[k])) filters[k] = [];
       });
       showTableFilters.value = false;
-      activeFilterCount.value = 0;
       // 滚动到表格
       setTimeout(() => {
-        const el = document.querySelector('.table-section, .data-table, [data-section=\"detail\"]');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (tableRef.value && tableRef.value.$el) {
+          tableRef.value.$el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          const tables = document.querySelectorAll('.el-table');
+          const last = tables[tables.length - 1];
+          if (last) last.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }, 100);
     };
 
     const activeFiltersDisplay = computed(() => {
       const labels = {
         confidence: '把握度',
-        partner: '伙伴',
+        partner: '伙伴名称',
         po_ho: 'PO/HO',
         owner: '人员',
         predict_month: '预测月份',
@@ -1495,6 +1510,7 @@ const app = createApp({
       refreshData,
       handleUpload,
       regenerateDemo,
+      partnerTableLabel,
       // 云同步
       syncStatus,
       syncConfigVisible,
@@ -1537,16 +1553,8 @@ const app = createApp({
         <div class="brand" v-else>
           <div class="logo">🏢</div>
           <div>
-            <div class="title">四川云生态机会点项目经营分析看板 <el-tag size="small" type="danger" effect="light" style="margin-left: 8px; vertical-align: middle;">DEMO</el-tag></div>
-            <div class="subtitle">
-              <a class="sb-link" @click.prevent="drillToDim('')">总项目数 {{ fmt.count(kpi.total_projects) }}</a>
-              ·
-              <a class="sb-link" @click.prevent="drillToDim('')">总项目规模 {{ fmt.amountW(kpi.total_amount) }} 万</a>
-              ·
-              <a class="sb-link" @click.prevent="drillToDim('')">云资源 {{ fmt.amountW(kpi.total_cloud) }} 万</a>
-              ·
-              <a class="sb-link" @click.prevent="drillToDim('')">总软件规模 {{ fmt.amountW(kpi.total_software) }} 万</a>
-              <span v-if="activeFilterCount > 0" style="color: var(--huawei-red); margin-left: 8px;">· {{ activeFilterCount }} 个筛选条件生效</span>
+            <div class="title">四川云生态机会点项目经营分析看板 <el-tag size="small" type="danger" effect="light" style="margin-left: 8px; vertical-align: middle;">DEMO</el-tag>
+              <span v-if="activeFilterCount > 0" style="margin-left: 12px; color: var(--huawei-red); font-size: 12px; font-weight: normal;">· {{ activeFilterCount }} 个筛选条件生效</span>
             </div>
           </div>
         </div>
@@ -1763,28 +1771,28 @@ const app = createApp({
 
         <!-- KPI 卡 -->
         <div class="kpi-grid">
-          <div class="kpi-card kpi-total">
+          <div class="kpi-card kpi-total" @click="drillToDim('')" title="点击查看明细">
             <div class="kpi-label">📊 总项目数</div>
             <div class="kpi-value">{{ fmt.count(kpi.total_projects) }}<span class="kpi-unit">个</span></div>
             <div class="kpi-extra">总规模 {{ fmt.amount(kpi.total_amount) }} 万</div>
           </div>
 
-          <div class="kpi-card kpi-software">
-            <div class="kpi-label">💻 总软件预算</div>
-            <div class="kpi-value">{{ fmt.amountW(kpi.total_software) }}<span class="kpi-unit">万</span></div>
-            <div class="kpi-extra">软件 / 总规模</div>
-          </div>
-
-          <div class="kpi-card kpi-cloud">
-            <div class="kpi-label">☁️ 总云资源</div>
-            <div class="kpi-value">{{ fmt.amountW(kpi.total_cloud) }}<span class="kpi-unit">万</span></div>
-            <div class="kpi-extra">云 / 总规模</div>
-          </div>
-
-          <div class="kpi-card kpi-scale">
+          <div class="kpi-card kpi-scale" @click="drillToDim('')" title="点击查看明细">
             <div class="kpi-label">💰 总项目规模</div>
             <div class="kpi-value">{{ fmt.amountW(kpi.total_amount) }}<span class="kpi-unit">万</span></div>
             <div class="kpi-extra">软件 + 云资源</div>
+          </div>
+
+          <div class="kpi-card kpi-cloud" @click="drillToDim('')" title="点击查看明细">
+            <div class="kpi-label">☁️ 云资源</div>
+            <div class="kpi-value">{{ fmt.amountW(kpi.total_cloud) }}<span class="kpi-unit">万</span></div>
+            <div class="kpi-extra">占总规模 {{ kpi.total_amount > 0 ? Math.round(kpi.total_cloud / kpi.total_amount * 100) : 0 }}%</div>
+          </div>
+
+          <div class="kpi-card kpi-software" @click="drillToDim('')" title="点击查看明细">
+            <div class="kpi-label">💻 软件规模</div>
+            <div class="kpi-value">{{ fmt.amountW(kpi.total_software) }}<span class="kpi-unit">万</span></div>
+            <div class="kpi-extra">占总规模 {{ kpi.total_amount > 0 ? Math.round(kpi.total_software / kpi.total_amount * 100) : 0 }}%</div>
           </div>
         </div>
 
@@ -1822,6 +1830,19 @@ const app = createApp({
                 <div class="card-title">PO vs HO 对比</div>
                 <div class="card-subtitle">金额柱 + 项目数柱</div>
               </div>
+              <!-- 颜色图例(与柱状图颜色一致) -->
+              <div class="poho-legend">
+                <div class="poho-leg-group">
+                  <span class="poho-leg-title">金额</span>
+                  <span class="poho-leg-po" title="PO 金额柱 #C7000B">▮ PO</span>
+                  <span class="poho-leg-ho" title="HO 金额柱 #FA8C16">▮ HO</span>
+                </div>
+                <div class="poho-leg-group">
+                  <span class="poho-leg-title">项目数</span>
+                  <span class="poho-leg-po-light" title="PO 项目数柱 rgba(199,0,11,0.25)">▮ PO</span>
+                  <span class="poho-leg-ho-light" title="HO 项目数柱 rgba(250,140,22,0.25)">▮ HO</span>
+                </div>
+              </div>
             </div>
             <div class="chart-body" :ref="el => (chartRefs.poHo = el)"></div>
           </div>
@@ -1836,9 +1857,9 @@ const app = createApp({
             </div>
             <div class="chart-body" :ref="el => (chartRefs.partner = el)"></div>
             <!-- 伙伴贡献明细表 -->
-            <el-table :data="dimPartner.buckets.slice(0, 10)" stripe size="small" style="margin-top: 8px; width: 100%;">
+            <el-table :data="dimPartner.buckets.slice(0, 10)" stripe size="small" style="margin-top: 8px; width: 100%;" empty-text="暂无伙伴数据">
               <el-table-column type="index" label="#" width="50" align="center" />
-              <el-table-column prop="key" label="伙伴" min-width="120" show-overflow-tooltip />
+              <el-table-column prop="key" :label="partnerTableLabel" min-width="140" show-overflow-tooltip />
               <el-table-column label="项目数" width="80" align="right" sortable :sort-by="(row) => row.count">
                 <template #default="{ row }">
                   <span class="amount-cell">{{ row.count }} 个</span>
@@ -1934,18 +1955,12 @@ const app = createApp({
           </div>
 
           <!-- ============ 明细表顶部横向筛选栏(与表格列对齐) ============ -->
-          <div class="tbl-filter-bar" :style="{ '--col-count': 17 }">
+          <div class="tbl-filter-bar" :style="{ '--col-count': 15 }">
             <!-- 序号(无筛选) -->
             <div class="tf-cell" style="width: 60px; flex-shrink: 0;"></div>
-            <!-- 项目编号(文本) -->
-            <div class="tf-cell" style="width: 130px; flex-shrink: 0;">
-              <el-input v-model="tableFilters.project_no[0]" placeholder="编号..." size="small" clearable @input="val => onTableFilterChange({ project_no: val ? [val] : [] })" style="width:100%">
-                <template #prefix><span style="font-size:10px;color:#bbb">🔍</span></template>
-              </el-input>
-            </div>
-            <!-- 机会点名称(文本) -->
-            <div class="tf-cell" style="flex: 1; min-width: 180px;">
-              <el-input v-model="tableFilters.opportunity_name[0]" placeholder="机会点名称..." size="small" clearable @input="val => onTableFilterChange({ opportunity_name: val ? [val] : [] })" style="width:100%">
+            <!-- 项目名称(文本) - 合并原"项目编号"和"机会点名称"两列 -->
+            <div class="tf-cell" style="flex: 1; min-width: 330px;">
+              <el-input v-model="tableFilters.opportunity_name[0]" placeholder="项目名称..." size="small" clearable @input="val => onTableFilterChange({ opportunity_name: val ? [val] : [] })" style="width:100%">
                 <template #prefix><span style="font-size:10px;color:#bbb">🔍</span></template>
               </el-input>
             </div>
@@ -1961,9 +1976,9 @@ const app = createApp({
                 <el-option v-for="o in columnFilterOptions.owner" :key="o.value" :label="o.text" :value="o.value" />
               </el-select>
             </div>
-            <!-- 伙伴(多选) -->
-            <div class="tf-cell" style="width: 120px; flex-shrink: 0;">
-              <el-select v-model="tableFilters.partner" multiple collapse-tags filterable size="small" placeholder="伙伴" clearable @change="val => onTableFilterChange({ partner: val })" style="width:100%">
+            <!-- 伙伴名称(多选) -->
+            <div class="tf-cell" style="width: 140px; flex-shrink: 0;">
+              <el-select v-model="tableFilters.partner" multiple collapse-tags filterable size="small" placeholder="伙伴名称" clearable @change="val => onTableFilterChange({ partner: val })" style="width:100%">
                 <el-option v-for="o in columnFilterOptions.partner" :key="o.value" :label="o.text" :value="o.value" />
               </el-select>
             </div>
@@ -2021,12 +2036,12 @@ const app = createApp({
           <el-table
             ref="tableRef"
             :data="projectList.items"
-            :row-key="row => row.opportunity_name || row.project_no"
+            :row-key="row => row.id || row.opportunity_name"
             stripe
             v-loading="loading"
             @sort-change="onTableSortChange"
           >
-            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column type="index" :index="indexMethod" label="序号" width="60" align="center" fixed="left" />
             <el-table-column prop="opportunity_name" label="项目名称" min-width="200" sortable="custom" show-overflow-tooltip />
             <el-table-column prop="customer" label="客户" width="120" sortable="custom" show-overflow-tooltip />
             <el-table-column prop="owner" label="人员" width="100" sortable="custom" />
