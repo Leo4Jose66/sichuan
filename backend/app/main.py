@@ -2,6 +2,10 @@
 """
 FastAPI 主应用
 """
+import sqlite3
+from pathlib import Path
+from sqlalchemy import inspect, text
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,6 +18,70 @@ from .static import mount_static
 from .cloud_sync import SyncService
 
 
+def auto_migrate():
+    """轻量级自动迁移 - 检查 ORM 模型新增的列,对 SQLite 库执行 ALTER TABLE
+    只补列、不改类型、不删列 - 足够覆盖添加可选字段的场景
+    """
+    if "sqlite" not in settings.database_url:
+        return  # 只为 SQLite 做轻量迁移,生产环境请用 Alembic
+
+    db_path = settings.database_url.replace("sqlite:///", "")
+    if not Path(db_path).exists():
+        return  # 数据库还不存在,会被 create_all 创建
+
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    if "projects" not in table_names:
+        return
+
+    existing_cols = {c["name"] for c in inspector.get_columns("projects")}
+    model_cols = Project.__table__.columns
+
+    # 类型映射(SQLAlchemy 类型 -> SQLite 类型)
+    type_map = {
+        "VARCHAR": "VARCHAR",
+        "STRING": "VARCHAR",
+        "TEXT": "TEXT",
+        "INTEGER": "INTEGER",
+        "FLOAT": "FLOAT",
+        "BOOLEAN": "BOOLEAN",
+        "DATETIME": "DATETIME",
+    }
+
+    added = []
+    with engine.connect() as conn:
+        for col in model_cols:
+            if col.name in existing_cols:
+                continue
+            # 只处理简单字段(没有 server_default 的简单类型)
+            col_type = str(col.type).split("(")[0].upper()
+            sqlite_type = type_map.get(col_type, "VARCHAR")
+            # 加上 nullable 和默认值
+            nullable = "" if col.nullable else " NOT NULL"
+            default = ""
+            if col.default is not None and col.default.arg is not None:
+                v = col.default.arg
+                if isinstance(v, str):
+                    default = f" DEFAULT '{v}'"
+                elif isinstance(v, (int, float)):
+                    default = f" DEFAULT {v}"
+                elif isinstance(v, bool):
+                    default = f" DEFAULT {1 if v else 0}"
+            sql = f'ALTER TABLE projects ADD COLUMN "{col.name}" {sqlite_type}{nullable}{default}'
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+                added.append(col.name)
+            except Exception as e:
+                # 列可能已被并发进程添加,忽略
+                if "duplicate column" not in str(e).lower():
+                    print(f"[Migration] 添加列 {col.name} 失败: {e}")
+    if added:
+        print(f"[Migration] 自动补充了 {len(added)} 个列: {added}")
+
+
+# 先自动迁移(补列),再创建表(创建新表)
+auto_migrate()
 # 初始化数据库
 Base.metadata.create_all(bind=engine)
 
